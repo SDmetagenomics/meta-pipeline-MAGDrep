@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# meta-pipeline-MAGQC launcher
+# Thin shim that delegates to the Python CLI entry point.
+set -euo pipefail
+
+exec python -m meta_pipeline_magqc.cli "$@"
