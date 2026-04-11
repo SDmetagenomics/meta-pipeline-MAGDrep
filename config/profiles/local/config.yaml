@@ -1,0 +1,4 @@
+# Local profile: run everything on the current machine.
+printshellcmds: true
+keep-going: true
+rerun-incomplete: true
