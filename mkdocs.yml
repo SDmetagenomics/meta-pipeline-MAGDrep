@@ -1,0 +1,69 @@
+site_name: meta-pipeline-MAGQC
+site_description: Quality assessment and taxonomy of MAGs at scale
+site_author: Diamond Lab, UC Berkeley
+repo_url: https://github.com/diamondlab-ucb/meta-pipeline-MAGQC
+repo_name: diamondlab-ucb/meta-pipeline-MAGQC
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue-grey
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue-grey
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - Overview: index.md
+  - Quick Start: quickstart.md
+  - Installation: installation.md
+  - Using the Pipeline:
+    - Inputs & Outputs: usage/inputs-outputs.md
+    - Configuration: usage/configuration.md
+  - Pipeline Steps:
+    - Architecture: pipeline/overview.md
+    - Genome Statistics: pipeline/genome-stats.md
+    - CheckM2 Quality: pipeline/checkm2.md
+    - GUNC Chimerism: pipeline/gunc.md
+    - GTDB-Tk Taxonomy: pipeline/gtdbtk.md
+    - Dereplication: pipeline/dereplicate.md
+  - Output Reference:
+    - Combined Report: outputs/combined-report.md
