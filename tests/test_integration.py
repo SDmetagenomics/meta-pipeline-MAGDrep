@@ -11,8 +11,8 @@ pytestmark = pytest.mark.slow
 @pytest.fixture
 def integration_output(tmp_path, test_mags_dir):
     """Run the pipeline on synthetic MAGs with genome_stats only."""
-    from meta_pipeline_magqc.config import load_and_merge_config
-    from meta_pipeline_magqc.runner import run_snakemake
+    from meta_pipeline_magdrep.config import load_and_merge_config
+    from meta_pipeline_magdrep.runner import run_snakemake
 
     output_dir = tmp_path / "results"
     cfg = load_and_merge_config(overrides={

@@ -9,8 +9,8 @@
 ## Option 1: pip (Recommended for Development)
 
 ```bash
-git clone https://github.com/diamondlab-ucb/meta-pipeline-MAGQC.git
-cd meta-pipeline-MAGQC
+git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
+cd meta-pipeline-MAGDrep
 pip install -e . --no-deps
 ```
 
@@ -27,16 +27,16 @@ pip install "gunc>=1.1.0"
 
 ```bash
 mamba env create -f container/environment.yml
-mamba activate magqc
+mamba activate magdrep
 pip install -e . --no-deps
 ```
 
 ## Option 3: Docker
 
 ```bash
-docker build -t meta-pipeline-magqc .
+docker build -t meta-pipeline-magdrep .
 docker run -v /path/to/dbs:/databases -v /path/to/mags:/input \
-  meta-pipeline-magqc qc -i /input -o /output
+  meta-pipeline-magdrep qc -i /input -o /output
 ```
 
 ## Database Downloads
@@ -44,20 +44,20 @@ docker run -v /path/to/dbs:/databases -v /path/to/mags:/input \
 Each tool requires a reference database. Use the built-in downloader:
 
 ```bash
-meta-pipeline-MAGQC db update --db-dir /data/magqc_dbs
+meta-pipeline-MAGDrep db update --db-dir /data/magdrep_dbs
 ```
 
 Or download manually:
 
 | Database | Command | Size |
 |----------|---------|------|
-| CheckM2 | `checkm2 database --download --path /data/magqc_dbs/checkm2` | ~3 GB |
-| GUNC | `gunc download_db /data/magqc_dbs/gunc --db gtdb_214` | ~14 GB |
-| GTDB-Tk | `download-db.sh /data/magqc_dbs/gtdbtk` | ~85 GB |
+| CheckM2 | `checkm2 database --download --path /data/magdrep_dbs/checkm2` | ~3 GB |
+| GUNC | `gunc download_db /data/magdrep_dbs/gunc --db gtdb_214` | ~14 GB |
+| GTDB-Tk | `download-db.sh /data/magdrep_dbs/gtdbtk` | ~85 GB |
 
 ## Verify Installation
 
 ```bash
-meta-pipeline-MAGQC --version
-meta-pipeline-MAGQC db status
+meta-pipeline-MAGDrep --version
+meta-pipeline-MAGDrep db status
 ```

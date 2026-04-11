@@ -47,10 +47,10 @@ Steps can be included or excluded at the command line:
 
 ```bash
 # Run only genome stats and CheckM2
-meta-pipeline-MAGQC qc -i mags/ -o results/ --steps genome_stats,checkm2
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --steps genome_stats,checkm2
 
 # Run everything except GTDB-Tk
-meta-pipeline-MAGQC qc -i mags/ -o results/ --skip gtdbtk
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk
 ```
 
 When a step is skipped, its columns are absent from the combined report and quality tiers that depend on those columns are marked as `NA`.

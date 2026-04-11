@@ -1,7 +1,7 @@
 import pytest
 import yaml
 from pathlib import Path
-from meta_pipeline_magqc.config import (
+from meta_pipeline_magdrep.config import (
     load_config, validate_config, merge_config,
     load_and_merge_config, ConfigError, VALID_STEPS,
 )

@@ -1,8 +1,8 @@
-site_name: meta-pipeline-MAGQC
+site_name: meta-pipeline-MAGDrep
 site_description: Quality assessment and taxonomy of MAGs at scale
 site_author: Diamond Lab, UC Berkeley
-repo_url: https://github.com/diamondlab-ucb/meta-pipeline-MAGQC
-repo_name: diamondlab-ucb/meta-pipeline-MAGQC
+repo_url: https://github.com/SDmetagenomics/meta-pipeline-MAGDrep
+repo_name: SDmetagenomics/meta-pipeline-MAGDrep
 edit_uri: edit/main/docs/
 
 theme:

@@ -1,6 +1,6 @@
 import pytest
 from click.testing import CliRunner
-from meta_pipeline_magqc.cli import main
+from meta_pipeline_magdrep.cli import main
 
 
 @pytest.fixture

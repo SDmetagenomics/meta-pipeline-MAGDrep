@@ -2,9 +2,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import click
-from meta_pipeline_magqc import __version__
-from meta_pipeline_magqc.config import load_and_merge_config, VALID_STEPS, ConfigError
-from meta_pipeline_magqc.resources import detect_resources
+from meta_pipeline_magdrep import __version__
+from meta_pipeline_magdrep.config import load_and_merge_config, VALID_STEPS, ConfigError
+from meta_pipeline_magdrep.resources import detect_resources
 
 VALID_PROFILES = {"local", "slurm"}
 
@@ -12,7 +12,7 @@ VALID_PROFILES = {"local", "slurm"}
 @click.group()
 @click.version_option(version=__version__)
 def main():
-    """meta-pipeline-MAGQC: quality assessment and taxonomy of MAGs at scale."""
+    """meta-pipeline-MAGDrep: quality assessment and taxonomy of MAGs at scale."""
     pass
 
 
@@ -71,7 +71,7 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs):
     if cfg["max_parallel_jobs"] == "auto":
         cfg["max_parallel_jobs"] = max(1, resources.cpu_count // cfg["threads_per_job"])
 
-    from meta_pipeline_magqc.runner import run_snakemake
+    from meta_pipeline_magdrep.runner import run_snakemake
     run_snakemake(
         input_dir=input_dir,
         config=cfg,

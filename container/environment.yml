@@ -1,4 +1,4 @@
-name: magqc
+name: magdrep
 channels:
   - conda-forge
   - bioconda

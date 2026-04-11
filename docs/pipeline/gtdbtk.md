@@ -28,7 +28,7 @@ Assign taxonomic classifications to MAGs using the Genome Taxonomy Database (GTD
 The GTDB-Tk database is large (~85 GB). Download with:
 
 ```bash
-meta-pipeline-MAGQC db update
+meta-pipeline-MAGDrep db update
 # or manually:
 download-db.sh databases/gtdbtk
 ```

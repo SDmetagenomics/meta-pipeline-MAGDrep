@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from meta_pipeline_magqc.runner import build_snakemake_config
+from meta_pipeline_magdrep.runner import build_snakemake_config
 
 
 @pytest.fixture

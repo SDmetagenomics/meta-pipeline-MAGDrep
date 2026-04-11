@@ -24,7 +24,7 @@ Detect chimeric genomes -- MAGs assembled from fragments of multiple organisms. 
 GUNC uses a taxonomic reference database (~14 GB). Download with:
 
 ```bash
-meta-pipeline-MAGQC db update
+meta-pipeline-MAGDrep db update
 # or manually:
 gunc download_db databases/gunc --db gtdb_214
 ```

@@ -1,9 +1,9 @@
-# SLURM profile for meta-pipeline-MAGQC
+# SLURM profile for meta-pipeline-MAGDrep
 #
 # Designed for nodes with 64 cores and 512 GB RAM.
 #
 # Usage:
-#   meta-pipeline-MAGQC qc -i mags/ -o results/ --profile slurm
+#   meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm
 
 executor: slurm
 jobs: 60

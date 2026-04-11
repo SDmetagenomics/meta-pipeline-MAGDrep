@@ -3,8 +3,8 @@
 ## 1. Clone and Install
 
 ```bash
-git clone https://github.com/diamondlab-ucb/meta-pipeline-MAGQC.git
-cd meta-pipeline-MAGQC
+git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
+cd meta-pipeline-MAGDrep
 pip install -e . --no-deps
 ```
 
@@ -14,10 +14,10 @@ CheckM2, GUNC, and GTDB-Tk each require reference databases. The `db` subcommand
 
 ```bash
 # Download all databases to the default location (./databases)
-meta-pipeline-MAGQC db update
+meta-pipeline-MAGDrep db update
 
 # Or specify a custom directory
-meta-pipeline-MAGQC db update --db-dir /data/magqc_dbs
+meta-pipeline-MAGDrep db update --db-dir /data/magdrep_dbs
 ```
 
 !!! note "Database sizes"
@@ -28,23 +28,23 @@ meta-pipeline-MAGQC db update --db-dir /data/magqc_dbs
 ## 3. Run the Pipeline
 
 ```bash
-meta-pipeline-MAGQC qc -i mags/ -o results/
+meta-pipeline-MAGDrep qc -i mags/ -o results/
 ```
 
 ### Common Options
 
 ```bash
 # Dry run -- show the job DAG without executing
-meta-pipeline-MAGQC qc -i mags/ -o results/ --dry-run
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --dry-run
 
 # Run only genome stats and CheckM2
-meta-pipeline-MAGQC qc -i mags/ -o results/ --steps genome_stats,checkm2
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --steps genome_stats,checkm2
 
 # Skip taxonomy (saves time if GTDB-Tk DB is not available)
-meta-pipeline-MAGQC qc -i mags/ -o results/ --skip gtdbtk
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk
 
 # Use a custom config file
-meta-pipeline-MAGQC qc -i mags/ -o results/ --config my_config.yaml
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --config my_config.yaml
 ```
 
 ## 4. Inspect Results

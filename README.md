@@ -1,4 +1,4 @@
-# meta-pipeline-MAGQC
+# meta-pipeline-MAGDrep
 
 Quality assessment, taxonomic classification, and species-level dereplication of metagenome-assembled genomes (MAGs) at scale.
 
@@ -13,17 +13,17 @@ Quality assessment, taxonomic classification, and species-level dereplication of
 
 ```bash
 # 1. Clone
-git clone https://github.com/diamondlab-ucb/meta-pipeline-MAGQC.git
-cd meta-pipeline-MAGQC
+git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
+cd meta-pipeline-MAGDrep
 
 # 2. Install
 pip install -e . --no-deps
 
 # 3. Download databases
-meta-pipeline-MAGQC db update
+meta-pipeline-MAGDrep db update
 
 # 4. Run
-meta-pipeline-MAGQC qc -i mags/ -o results/
+meta-pipeline-MAGDrep qc -i mags/ -o results/
 ```
 
 > **Note:** External tools (CheckM2, GUNC, GTDB-Tk, SeqKit, skani) must be installed separately via conda/mamba. See [container/environment.yml](container/environment.yml) for pinned versions.
@@ -32,7 +32,7 @@ meta-pipeline-MAGQC qc -i mags/ -o results/
 
 ## Overview
 
-`meta-pipeline-MAGQC` takes a directory of MAG FASTA files and produces:
+`meta-pipeline-MAGDrep` takes a directory of MAG FASTA files and produces:
 
 - **Assembly statistics** per genome (N50, GC%, contig count, total length) via SeqKit
 - **Completeness and contamination** estimates via CheckM2
@@ -93,10 +93,10 @@ Quality score = completeness - 5 * contamination
 ## CLI Reference
 
 ```
-meta-pipeline-MAGQC --version
-meta-pipeline-MAGQC qc -i DIR -o DIR [OPTIONS]
-meta-pipeline-MAGQC db update [--db-dir DIR]
-meta-pipeline-MAGQC db status [--db-dir DIR]
+meta-pipeline-MAGDrep --version
+meta-pipeline-MAGDrep qc -i DIR -o DIR [OPTIONS]
+meta-pipeline-MAGDrep db update [--db-dir DIR]
+meta-pipeline-MAGDrep db status [--db-dir DIR]
 ```
 
 ### `qc` options

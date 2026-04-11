@@ -23,7 +23,7 @@ Estimate genome completeness and contamination using a gradient-boosted machine 
 CheckM2 requires a pre-trained model (~3 GB). Download with:
 
 ```bash
-meta-pipeline-MAGQC db update
+meta-pipeline-MAGDrep db update
 # or manually:
 checkm2 database --download --path databases/checkm2
 ```

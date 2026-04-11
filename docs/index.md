@@ -1,10 +1,10 @@
-# meta-pipeline-MAGQC
+# meta-pipeline-MAGDrep
 
 **Quality assessment, taxonomic classification, and species-level dereplication of metagenome-assembled genomes (MAGs) at scale.**
 
 ## What It Does
 
-meta-pipeline-MAGQC takes a directory of MAG FASTA files and runs a standardized quality-control pipeline:
+meta-pipeline-MAGDrep takes a directory of MAG FASTA files and runs a standardized quality-control pipeline:
 
 1. **Assembly statistics** -- contig count, N50, GC%, total length via SeqKit
 2. **Completeness and contamination** -- gradient-boosted ML estimates via CheckM2
@@ -18,11 +18,11 @@ The pipeline is designed for datasets of 10,000+ genomes. Batch processing keeps
 ## Quick Start
 
 ```bash
-git clone https://github.com/diamondlab-ucb/meta-pipeline-MAGQC.git
-cd meta-pipeline-MAGQC
+git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
+cd meta-pipeline-MAGDrep
 pip install -e . --no-deps
-meta-pipeline-MAGQC db update
-meta-pipeline-MAGQC qc -i mags/ -o results/
+meta-pipeline-MAGDrep db update
+meta-pipeline-MAGDrep qc -i mags/ -o results/
 ```
 
 See the [Quick Start](quickstart.md) guide for full details.
