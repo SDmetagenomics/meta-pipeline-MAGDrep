@@ -1,0 +1,33 @@
+name: magdrep
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  # Workflow engine
+  - snakemake=9.18
+  - snakemake-executor-plugin-slurm
+  # Python dependencies
+  - click=8.1
+  - pyyaml=6.0
+  - biopython>=1.83
+  # Assembly stats
+  - seqkit=2.8
+  # Genome quality
+  - checkm2=1.0.2
+  # Chimerism detection (GUNC requires diamond and prodigal)
+  - diamond=2.1
+  - prodigal=2.6
+  # Taxonomy
+  - gtdbtk=2.5
+  # Dereplication
+  - skani=0.2
+  # Testing
+  - pytest>=7.0
+  # Utilities
+  - parallel=20231022
+  - pip:
+    - gunc>=1.1.0
+    - -e .  # Install meta-pipeline-MAGDrep itself

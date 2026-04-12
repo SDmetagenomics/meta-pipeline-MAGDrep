@@ -16,17 +16,20 @@ Quality assessment, taxonomic classification, and species-level dereplication of
 git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
 cd meta-pipeline-MAGDrep
 
-# 2. Install
-pip install -e . --no-deps
+# 2. Install (creates conda env with all tools + the pipeline)
+make install
+conda activate magdrep
 
 # 3. Download databases
-meta-pipeline-MAGDrep db update
+checkm2 database --download --path databases/checkm2
+gunc download_db databases/gunc -db gtdb_214
+# GTDB-Tk: see https://ecogenomics.github.io/GTDBTk/installing/bioconda.html
 
 # 4. Run
 meta-pipeline-MAGDrep qc -i mags/ -o results/
 ```
 
-> **Note:** External tools (CheckM2, GUNC, GTDB-Tk, SeqKit, skani) must be installed separately via conda/mamba. See [container/environment.yml](container/environment.yml) for pinned versions.
+> **Requires [mamba](https://mamba.readthedocs.io/).** `make install` creates a conda environment called `magdrep` with all bioinformatics tools (CheckM2, GUNC, GTDB-Tk, SeqKit, skani) and the pipeline itself. See [environment.yml](environment.yml) for pinned versions.
 
 ---
 
