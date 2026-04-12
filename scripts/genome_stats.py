@@ -49,8 +49,9 @@ def _stats_via_seqkit(fasta_path: Path) -> dict:
     for line in result.stdout.strip().split("\n"):
         parts = line.split("\t")
         if len(parts) >= 3:
-            length = int(parts[2])
-            gc = float(parts[1])
+            # seqkit fx2tab --gc --length outputs: name  length  gc
+            length = int(parts[1])
+            gc = float(parts[2])
             lengths.append(length)
             gc_weighted_sum += gc * length
             total_length += length
