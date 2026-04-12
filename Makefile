@@ -2,7 +2,7 @@
 
 # One-command install: creates conda env with all tools + the pipeline itself
 install:
-	mamba env create -f environment.yml --force
+	mamba env create -f environment.yml --yes
 	@echo ""
 	@echo "Done. Activate with:  conda activate magdrep"
 

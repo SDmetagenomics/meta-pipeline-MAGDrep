@@ -55,14 +55,14 @@ def assign_quality_tier(row: dict, cfg: dict) -> str:
     gunc_pass = _to_bool(row.get("pass_gunc"), True)
 
     is_high = (
-        comp >= cfg["high_completeness"]
-        and contam < cfg["high_contamination"]
-        and qscore >= cfg["min_quality_score"]
+        comp >= float(cfg["high_completeness"])
+        and contam < float(cfg["high_contamination"])
+        and qscore >= float(cfg["min_quality_score"])
     )
     is_medium = (
-        comp >= cfg["medium_completeness"]
-        and contam < cfg["medium_contamination"]
-        and qscore >= cfg["min_quality_score"]
+        comp >= float(cfg["medium_completeness"])
+        and contam < float(cfg["medium_contamination"])
+        and qscore >= float(cfg["min_quality_score"])
     )
 
     if is_high and gunc_pass:
@@ -176,8 +176,20 @@ def _write_tsv(rows: list[dict], columns: list[str], output_path: str) -> None:
             f.write("\t".join(str(row.get(c, "")) for c in columns) + "\n")
 
 
+DEFAULT_QUALITY_CFG = {
+    "high_completeness": 90.0,
+    "high_contamination": 5.0,
+    "medium_completeness": 60.0,
+    "medium_contamination": 10.0,
+    "min_quality_score": 50.0,
+    "gunc_css_threshold": 0.45,
+    "default_filter": "medium_quality",
+}
+
+
 if __name__ == "__main__":
     import argparse
+    import json
 
     parser = argparse.ArgumentParser(description="Merge QC reports and assign quality tiers")
     parser.add_argument("--stats-dir", required=True)
@@ -186,10 +198,19 @@ if __name__ == "__main__":
     parser.add_argument("--gtdbtk", default=None)
     parser.add_argument("--output-combined", required=True)
     parser.add_argument("--output-filtered", required=True)
-    parser.add_argument("--quality-config", default="{}")
+    parser.add_argument("--quality-config", default=None,
+                        help="JSON string or path to YAML config file")
     args = parser.parse_args()
 
-    quality_cfg = ast.literal_eval(args.quality_config) if args.quality_config else {}
+    # Parse quality config: try JSON string first, then YAML file, then defaults
+    quality_cfg = DEFAULT_QUALITY_CFG.copy()
+    if args.quality_config:
+        try:
+            quality_cfg.update(json.loads(args.quality_config))
+        except (json.JSONDecodeError, TypeError):
+            # Not JSON — might be a Python repr or garbage from shell quoting.
+            # Fall back to defaults.
+            pass
 
     merge_all_reports(
         stats_dir=args.stats_dir,
