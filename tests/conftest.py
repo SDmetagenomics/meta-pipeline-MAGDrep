@@ -1,8 +1,12 @@
+import sys
+
 import pytest
 from pathlib import Path
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
 TEST_MAGS_DIR = TEST_DATA_DIR / "mags"
+TEST_GENOMES_DIR = TEST_DATA_DIR / "genomes"
+TEST_GENOMES_MANIFEST = TEST_DATA_DIR / "test_genomes_manifest.tsv"
 
 
 @pytest.fixture
@@ -68,3 +72,23 @@ def tmp_mag_dir(tmp_path):
         ">contig_1\n" + "ATGC" * 300 + "\n"
     )
     return mag_dir
+
+
+@pytest.fixture(scope="session")
+def test_genomes_dir():
+    """
+    Return path to the 50 real test genomes.
+    Downloads from GitHub Release on first access if not present locally.
+    """
+    if TEST_GENOMES_DIR.exists() and len(list(TEST_GENOMES_DIR.glob("*.fna"))) >= 50:
+        return TEST_GENOMES_DIR
+
+    import subprocess
+    download_script = TEST_DATA_DIR / "download_test_genomes.py"
+    subprocess.run(
+        [sys.executable, str(download_script),
+         "--source", "github",
+         "--output-dir", str(TEST_GENOMES_DIR)],
+        check=True,
+    )
+    return TEST_GENOMES_DIR
