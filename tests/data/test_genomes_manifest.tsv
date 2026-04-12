@@ -40,7 +40,7 @@ GCF_000017945.1	Geobacter sulfurreducens	PCA	Bacteria	Desulfobacterota	Desulfuro
 GCF_000015005.1	Lactiplantibacillus plantarum	WCFS1	Bacteria	Bacillota	Lactobacillia	3.3	unique	Probiotic lactic acid bacterium
 GCF_000009985.1	Streptomyces coelicolor	A3(2)	Bacteria	Actinomycetota	Actinomycetia	8.7	unique	Antibiotic producer model
 GCF_000195735.1	Corynebacterium glutamicum	ATCC 13032	Bacteria	Actinomycetota	Actinomycetia	3.3	unique	Industrial amino acid producer
-GCF_000014165.1	Campylobacter jejuni	NCTC 11168	Bacteria	Campylobacterota	Campylobacteria	1.6	unique	Foodborne pathogen
+GCF_000009085.1	Campylobacter jejuni	NCTC 11168	Bacteria	Campylobacterota	Campylobacteria	1.6	unique	Foodborne pathogen
 GCF_000021665.1	Leptospira interrogans	serovar Lai	Bacteria	Spirochaetota	Leptospirae	4.6	unique	Zoonotic spirochete
 GCF_000013925.1	Rickettsia prowazekii	Madrid E	Bacteria	Pseudomonadota	Alphaproteobacteria	1.1	unique	Obligate intracellular pathogen
 GCF_000195915.1	Methanothermobacter thermautotrophicus	Delta H	Archaea	Euryarchaeota	Methanobacteria	1.8	unique	Methanogenic archaeon
@@ -48,4 +48,4 @@ GCF_000006805.1	Halobacterium salinarum	NRC-1	Archaea	Euryarchaeota	Halobacteria
 GCF_000007005.1	Sulfolobus solfataricus	P2	Archaea	Thermoproteota	Thermoprotei	3.0	unique	Thermoacidophilic archaeon
 GCF_000018465.1	Nitrosopumilus maritimus	SCM1	Archaea	Nitrososphaerota	Nitrososphaeria	1.6	unique	Ammonia-oxidizing archaeon
 GCF_000007205.1	Thermococcus kodakarensis	KOD1	Archaea	Euryarchaeota	Thermococci	2.1	unique	Hyperthermophilic archaeon
-GCF_000014165.2	Fibrobacter succinogenes	S85	Bacteria	Fibrobacterota	Fibrobacteria	3.8	unique	Cellulose-degrading rumen bacterium
+GCF_000146505.1	Fibrobacter succinogenes	S85	Bacteria	Fibrobacterota	Fibrobacteria	3.8	unique	Cellulose-degrading rumen bacterium
