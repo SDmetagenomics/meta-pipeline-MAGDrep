@@ -1,0 +1,50 @@
+accession	organism	strain	domain	phylum	class	genome_size_mb	cluster_group	description
+GCF_000005845.2	Escherichia coli	K-12 MG1655	Bacteria	Pseudomonadota	Gammaproteobacteria	4.6	ecoli	K-12 reference strain
+GCF_000008865.2	Escherichia coli	O157:H7 EDL933	Bacteria	Pseudomonadota	Gammaproteobacteria	5.5	ecoli	Enterohemorrhagic O157:H7
+GCF_000007445.1	Escherichia coli	CFT073	Bacteria	Pseudomonadota	Gammaproteobacteria	5.2	ecoli	Uropathogenic strain
+GCF_000026245.1	Escherichia coli	55989	Bacteria	Pseudomonadota	Gammaproteobacteria	5.2	ecoli	Enteroaggregative strain
+GCF_000026325.1	Escherichia coli	UMN026	Bacteria	Pseudomonadota	Gammaproteobacteria	5.4	ecoli	Extraintestinal pathogenic
+GCF_000013425.1	Staphylococcus aureus	NCTC 8325	Bacteria	Bacillota	Bacilli	2.8	saureus	Reference strain
+GCF_000009585.1	Staphylococcus aureus	USA300 FPR3757	Bacteria	Bacillota	Bacilli	2.9	saureus	Community-acquired MRSA
+GCF_000011505.1	Staphylococcus aureus	COL	Bacteria	Bacillota	Bacilli	2.8	saureus	Early MRSA isolate
+GCF_000012045.1	Staphylococcus aureus	MRSA252	Bacteria	Bacillota	Bacilli	2.9	saureus	Hospital-acquired MRSA
+GCF_000009045.1	Bacillus subtilis	168	Bacteria	Bacillota	Bacilli	4.2	bsubtilis	Reference strain
+GCF_000227465.1	Bacillus subtilis	BSn5	Bacteria	Bacillota	Bacilli	4.1	bsubtilis	Plant-associated strain
+GCF_000496555.1	Bacillus subtilis	QB928	Bacteria	Bacillota	Bacilli	4.1	bsubtilis	Industrial strain
+GCF_000006765.1	Pseudomonas aeruginosa	PAO1	Bacteria	Pseudomonadota	Gammaproteobacteria	6.3	paeruginosa	Reference strain
+GCF_000014625.1	Pseudomonas aeruginosa	UCBPP-PA14	Bacteria	Pseudomonadota	Gammaproteobacteria	6.5	paeruginosa	Virulent clinical isolate
+GCF_000006945.2	Pseudomonas aeruginosa	LESB58	Bacteria	Pseudomonadota	Gammaproteobacteria	6.6	paeruginosa	Liverpool epidemic strain
+GCF_000195955.2	Mycobacterium tuberculosis	H37Rv	Bacteria	Actinomycetota	Actinomycetia	4.4	unique	Actinomycetia representative
+GCF_000196035.1	Deinococcus radiodurans	R1	Bacteria	Deinococcota	Deinococci	3.3	unique	Radiation-resistant extremophile
+GCF_000009065.1	Thermus thermophilus	HB8	Bacteria	Deinococcota	Deinococci	2.1	unique	Thermophile model organism
+GCF_000011465.1	Caulobacter vibrioides	CB15	Bacteria	Pseudomonadota	Alphaproteobacteria	4.0	unique	Cell cycle model organism
+GCF_000007145.1	Ralstonia solanacearum	GMI1000	Bacteria	Pseudomonadota	Betaproteobacteria	5.8	unique	Plant pathogen
+GCF_000020225.1	Helicobacter pylori	26695	Bacteria	Campylobacterota	Epsilonproteobacteria	1.7	unique	Gastric pathogen
+GCF_000195515.1	Clostridioides difficile	630	Bacteria	Bacillota	Clostridia	4.3	unique	Nosocomial pathogen
+GCF_000011065.1	Bacteroides thetaiotaomicron	VPI-5482	Bacteria	Bacteroidota	Bacteroidia	6.3	unique	Gut commensal model
+GCF_000006745.1	Vibrio cholerae	O1 N16961	Bacteria	Pseudomonadota	Gammaproteobacteria	4.0	unique	Cholera pandemic strain
+GCF_000009725.1	Synechocystis sp.	PCC 6803	Bacteria	Cyanobacteriota	Cyanobacteriia	3.6	unique	Photosynthesis model
+GCF_000008525.1	Treponema pallidum	Nichols	Bacteria	Spirochaetota	Spirochaetia	1.1	unique	Syphilis agent
+GCF_000027305.1	Borreliella burgdorferi	B31	Bacteria	Spirochaetota	Spirochaetia	1.5	unique	Lyme disease agent
+GCF_000027325.1	Chlamydia trachomatis	D/UW-3/CX	Bacteria	Chlamydiota	Chlamydiia	1.0	unique	Obligate intracellular pathogen
+GCF_000008745.1	Mycoplasma genitalium	G37	Bacteria	Mycoplasmatota	Mollicutes	0.6	unique	Minimal genome organism
+GCF_000016525.1	Rhodopirellula baltica	SH 1	Bacteria	Planctomycetota	Planctomycetia	7.1	unique	Marine planctomycete
+GCF_000024845.1	Akkermansia muciniphila	ATCC BAA-835	Bacteria	Verrucomicrobiota	Verrucomicrobiae	2.7	unique	Gut mucin degrader
+GCF_000018865.1	Dehalococcoides mccartyi	195	Bacteria	Chloroflexota	Dehalococcoidia	1.5	unique	Organohalide respirer
+GCF_000007325.1	Fusobacterium nucleatum	ATCC 25586	Bacteria	Fusobacteriota	Fusobacteriia	2.2	unique	Oral/colorectal pathogen
+GCF_000014005.1	Acidobacterium capsulatum	ATCC 51196	Bacteria	Acidobacteriota	Acidobacteriia	4.1	unique	Soil acidobacterium
+GCF_000018285.1	Thermotoga maritima	MSB8	Bacteria	Thermotogota	Thermotogae	1.9	unique	Hyperthermophile
+GCF_000025525.1	Aquifex aeolicus	VF5	Bacteria	Aquificota	Aquificae	1.6	unique	Deep-branching thermophile
+GCF_000020965.1	Chlorobaculum tepidum	TLS	Bacteria	Chlorobiota	Chlorobia	2.2	unique	Green sulfur bacterium
+GCF_000017945.1	Geobacter sulfurreducens	PCA	Bacteria	Desulfobacterota	Desulfuromonadia	3.8	unique	Metal-reducing bacterium
+GCF_000015005.1	Lactiplantibacillus plantarum	WCFS1	Bacteria	Bacillota	Lactobacillia	3.3	unique	Probiotic lactic acid bacterium
+GCF_000009985.1	Streptomyces coelicolor	A3(2)	Bacteria	Actinomycetota	Actinomycetia	8.7	unique	Antibiotic producer model
+GCF_000195735.1	Corynebacterium glutamicum	ATCC 13032	Bacteria	Actinomycetota	Actinomycetia	3.3	unique	Industrial amino acid producer
+GCF_000014165.1	Campylobacter jejuni	NCTC 11168	Bacteria	Campylobacterota	Campylobacteria	1.6	unique	Foodborne pathogen
+GCF_000021665.1	Leptospira interrogans	serovar Lai	Bacteria	Spirochaetota	Leptospirae	4.6	unique	Zoonotic spirochete
+GCF_000013925.1	Rickettsia prowazekii	Madrid E	Bacteria	Pseudomonadota	Alphaproteobacteria	1.1	unique	Obligate intracellular pathogen
+GCF_000195915.1	Methanothermobacter thermautotrophicus	Delta H	Archaea	Euryarchaeota	Methanobacteria	1.8	unique	Methanogenic archaeon
+GCF_000006805.1	Halobacterium salinarum	NRC-1	Archaea	Euryarchaeota	Halobacteria	2.6	unique	Extreme halophile
+GCF_000007005.1	Sulfolobus solfataricus	P2	Archaea	Thermoproteota	Thermoprotei	3.0	unique	Thermoacidophilic archaeon
+GCF_000018465.1	Nitrosopumilus maritimus	SCM1	Archaea	Nitrososphaerota	Nitrososphaeria	1.6	unique	Ammonia-oxidizing archaeon
+GCF_000007205.1	Thermococcus kodakarensis	KOD1	Archaea	Euryarchaeota	Thermococci	2.1	unique	Hyperthermophilic archaeon
