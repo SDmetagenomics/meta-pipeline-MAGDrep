@@ -53,6 +53,7 @@ markdown_extensions:
 
 nav:
   - Overview: index.md
+  - Program Guide: program-guide.md
   - Quick Start: quickstart.md
   - Installation: installation.md
   - Using the Pipeline:
@@ -62,8 +63,10 @@ nav:
     - Architecture: pipeline/overview.md
     - Genome Statistics: pipeline/genome-stats.md
     - CheckM2 Quality: pipeline/checkm2.md
-    - GUNC Chimerism: pipeline/gunc.md
     - GTDB-Tk Taxonomy: pipeline/gtdbtk.md
     - Dereplication: pipeline/dereplicate.md
+  - Deployment:
+    - SLURM / HPC: deployment/slurm.md
+    - Google Cloud (Batch): deployment/gcp.md
   - Output Reference:
     - Combined Report: outputs/combined-report.md
