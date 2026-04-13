@@ -1,8 +1,12 @@
-"""Species-level genome dereplication via skani triangle + greedy clustering."""
+"""Species-level genome dereplication via skani triangle + average-linkage clustering."""
 from __future__ import annotations
 import math
 import subprocess
 from pathlib import Path
+
+import numpy as np
+from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.spatial.distance import squareform
 
 
 def parse_edge_list(edge_path: Path) -> list[dict]:
@@ -51,94 +55,209 @@ def compute_composite_scores(genomes: dict[str, dict], weights: dict) -> dict[st
     if not mag_ids:
         return {}
 
+    # Coerce weights to float (Snakemake's config pipeline can stringify values)
+    w_qscore = float(weights.get("w_qscore", 1.0))
+    w_completeness = float(weights.get("w_completeness", 1.0))
+    w_n50 = float(weights.get("w_n50", 0.5))
+    w_contam = float(weights.get("w_contam", 0.5))
+
     raw_qscore = [float(genomes[m].get("quality_score", 0)) for m in mag_ids]
     raw_comp = [float(genomes[m].get("completeness", 0)) for m in mag_ids]
     raw_n50 = [math.log10(max(float(genomes[m].get("n50_bp", 1)), 1)) for m in mag_ids]
     raw_contam = [100.0 - float(genomes[m].get("contamination", 0)) for m in mag_ids]
-    raw_gunc = [1.0 - float(genomes[m].get("css", 0)) for m in mag_ids]
 
     norm_qscore = _min_max_normalize(raw_qscore)
     norm_comp = _min_max_normalize(raw_comp)
     norm_n50 = _min_max_normalize(raw_n50)
     norm_contam = _min_max_normalize(raw_contam)
-    norm_gunc = _min_max_normalize(raw_gunc)
 
     scores = {}
     for i, mid in enumerate(mag_ids):
         scores[mid] = (
-            weights.get("w_qscore", 1.0) * norm_qscore[i]
-            + weights.get("w_completeness", 1.0) * norm_comp[i]
-            + weights.get("w_n50", 0.5) * norm_n50[i]
-            + weights.get("w_contam", 0.5) * norm_contam[i]
-            + weights.get("w_gunc", 0.5) * norm_gunc[i]
+            w_qscore * norm_qscore[i]
+            + w_completeness * norm_comp[i]
+            + w_n50 * norm_n50[i]
+            + w_contam * norm_contam[i]
         )
     return scores
 
 
-def greedy_cluster(
+def build_distance_matrix(
+    mag_ids: list[str],
+    edges: list[dict],
+    min_af: float,
+) -> np.ndarray:
+    """Build a symmetric ANI distance matrix from skani edges.
+
+    - Pairs passing the bi-directional AF filter: distance = 100 - ANI
+    - Pairs failing AF filter or with no edge: distance = 100 (blocked)
+    """
+    n = len(mag_ids)
+    idx = {mid: i for i, mid in enumerate(mag_ids)}
+    dist = np.full((n, n), 100.0)
+    np.fill_diagonal(dist, 0.0)
+
+    for e in edges:
+        ref, query = e["ref"], e["query"]
+        if ref not in idx or query not in idx:
+            continue
+        # Bi-directional AF filter
+        if e["af_ref"] < min_af or e["af_query"] < min_af:
+            continue
+        d = 100.0 - e["ani"]
+        i, j = idx[ref], idx[query]
+        dist[i, j] = d
+        dist[j, i] = d
+
+    return dist
+
+
+def _find_connected_components(
+    mag_ids: list[str],
+    edges: list[dict],
+    min_af: float,
+    component_ani: float = 90.0,
+) -> list[list[str]]:
+    """Find connected components in the genome similarity graph.
+
+    An edge is included if ANI >= component_ani AND both AF directions >= min_af.
+    Genomes with no qualifying edges become singleton components.
+    """
+    mag_set = set(mag_ids)
+    adj: dict[str, set[str]] = {m: set() for m in mag_ids}
+    for e in edges:
+        ref, query = e["ref"], e["query"]
+        if ref not in mag_set or query not in mag_set:
+            continue
+        if e["ani"] < component_ani:
+            continue
+        if e["af_ref"] < min_af or e["af_query"] < min_af:
+            continue
+        adj[ref].add(query)
+        adj[query].add(ref)
+
+    visited: set[str] = set()
+    components: list[list[str]] = []
+    for mid in mag_ids:
+        if mid in visited:
+            continue
+        # BFS
+        component = []
+        queue = [mid]
+        visited.add(mid)
+        while queue:
+            node = queue.pop(0)
+            component.append(node)
+            for neighbor in adj[node]:
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+        components.append(sorted(component))
+
+    return components
+
+
+def _cluster_component(
+    component: list[str],
+    scores: dict[str, float],
+    edges: list[dict],
+    ani_threshold: float,
+    min_af: float,
+    pair_ani: dict[tuple[str, str], tuple[float, float]],
+) -> list[tuple[str, list[str]]]:
+    """Run average-linkage clustering on a single connected component.
+
+    Returns a list of (representative, members) tuples.
+    """
+    # Singleton — trivial cluster
+    if len(component) == 1:
+        return [(component[0], component)]
+
+    # Two genomes — check if they cluster
+    if len(component) == 2:
+        a, b = component
+        ani_val, _ = pair_ani.get((a, b), (0.0, 0.0))
+        if ani_val >= ani_threshold:
+            rep = max(component, key=lambda m: scores.get(m, 0))
+            return [(rep, component)]
+        else:
+            return [(a, [a]), (b, [b])]
+
+    dist = build_distance_matrix(component, edges, min_af)
+    condensed = squareform(dist)
+    Z = linkage(condensed, method="average")
+    cut_distance = 100.0 - ani_threshold
+    labels = fcluster(Z, t=cut_distance, criterion="distance")
+
+    label_members: dict[int, list[str]] = {}
+    for i, lab in enumerate(labels):
+        label_members.setdefault(lab, []).append(component[i])
+
+    result = []
+    for members in label_members.values():
+        rep = max(members, key=lambda m: scores.get(m, 0))
+        result.append((rep, members))
+    return result
+
+
+def average_linkage_cluster(
     scores: dict[str, float],
     edges: list[dict],
     ani_threshold: float,
     min_af: float,
 ) -> dict[str, dict]:
     """
-    Greedy species-level clustering.
+    Species-level clustering via average linkage (UPGMA).
 
-    1. Sort genomes by composite_score descending.
-    2. For each unclustered genome: make it a new cluster representative.
-    3. Assign unclustered neighbors where ANI >= threshold AND
-       both AF directions >= min_af.
+    For scalability, genomes are first partitioned into connected components
+    at 90% ANI. Average-linkage clustering is then performed independently
+    within each component, avoiding a single large distance matrix.
+
+    1. Find connected components at 90% ANI (with AF filter).
+    2. Within each component, build distance matrix and run average linkage.
+    3. Cut dendrogram at (100 - ani_threshold) to define species clusters.
+    4. Select the highest composite-score genome as representative per cluster.
     """
-    adj: dict[str, list[tuple[str, float, float, float]]] = {m: [] for m in scores}
-    for e in edges:
-        ref, query = e["ref"], e["query"]
-        if ref in scores and query in scores:
-            adj[ref].append((query, e["ani"], e["af_ref"], e["af_query"]))
-            adj[query].append((ref, e["ani"], e["af_query"], e["af_ref"]))
+    mag_ids = sorted(scores.keys())
+    if not mag_ids:
+        return {}
 
-    sorted_mags = sorted(scores.keys(), key=lambda m: scores[m], reverse=True)
+    # Build pair lookup for ANI/AF to representative
+    pair_ani: dict[tuple[str, str], tuple[float, float]] = {}
+    for e in edges:
+        pair_ani[(e["ref"], e["query"])] = (e["ani"], e["af_ref"])
+        pair_ani[(e["query"], e["ref"])] = (e["ani"], e["af_query"])
+
+    components = _find_connected_components(mag_ids, edges, min_af)
 
     clusters: dict[str, dict] = {}
-    assigned: set[str] = set()
     cluster_counter = 0
 
-    for mag_id in sorted_mags:
-        if mag_id in assigned:
-            continue
+    for component in components:
+        sub_clusters = _cluster_component(
+            component, scores, edges, ani_threshold, min_af, pair_ani,
+        )
+        for rep, members in sub_clusters:
+            cluster_counter += 1
+            cluster_id = f"cluster_{str(cluster_counter).zfill(4)}"
 
-        cluster_counter += 1
-        cluster_id = f"cluster_{str(cluster_counter).zfill(4)}"
-        members = [mag_id]
-        assigned.add(mag_id)
+            for member in members:
+                if member == rep:
+                    ani_to_rep = 100.0
+                    af_to_rep = 100.0
+                else:
+                    ani_to_rep, af_to_rep = pair_ani.get((member, rep), (0.0, 0.0))
 
-        for neighbor, ani, af_to_neighbor, af_from_neighbor in adj[mag_id]:
-            if neighbor in assigned:
-                continue
-            if (ani >= ani_threshold
-                    and af_to_neighbor >= min_af
-                    and af_from_neighbor >= min_af):
-                members.append(neighbor)
-                assigned.add(neighbor)
-
-        for member in members:
-            ani_to_rep = 100.0
-            af_to_rep = 100.0
-            if member != mag_id:
-                for n, ani, af_r, af_q in adj[member]:
-                    if n == mag_id:
-                        ani_to_rep = ani
-                        af_to_rep = af_r
-                        break
-            clusters[member] = {
-                "mag_id": member,
-                "cluster_id": cluster_id,
-                "representative": mag_id,
-                "is_representative": member == mag_id,
-                "composite_score": scores.get(member, 0),
-                "ani_to_rep": ani_to_rep,
-                "af_to_rep": af_to_rep,
-                "cluster_size": len(members),
-            }
+                clusters[member] = {
+                    "mag_id": member,
+                    "cluster_id": cluster_id,
+                    "representative": rep,
+                    "is_representative": member == rep,
+                    "composite_score": scores.get(member, 0),
+                    "ani_to_rep": ani_to_rep,
+                    "af_to_rep": af_to_rep,
+                    "cluster_size": len(members),
+                }
 
     return clusters
 
@@ -203,7 +322,7 @@ def run_cluster(
 
     edges = parse_edge_list(Path(edge_list))
     scores = compute_composite_scores(genomes, score_weights)
-    clusters = greedy_cluster(scores, edges, ani_threshold, min_af)
+    clusters = average_linkage_cluster(scores, edges, ani_threshold, min_af)
 
     cluster_cols = [
         "mag_id", "cluster_id", "representative", "is_representative",
@@ -234,7 +353,7 @@ def run_cluster(
 
 
 if __name__ == "__main__":
-    import ast
+    import json
     import sys
 
     subcommand = sys.argv[1]
@@ -262,7 +381,7 @@ if __name__ == "__main__":
         parser.add_argument("--min-af", type=float, default=10.0)
         parser.add_argument("--score-weights", default="{}")
         args = parser.parse_args(sys.argv[2:])
-        weights = ast.literal_eval(args.score_weights) if args.score_weights else {}
+        weights = json.loads(args.score_weights) if args.score_weights else {}
         run_cluster(args.edge_list, args.filtered_report,
                     args.output_clusters, args.output_derep_report,
                     args.ani_threshold, args.min_af, weights)
