@@ -8,7 +8,7 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-9.16-039475?logo=snakemake&logoColor=white)](https://snakemake.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-58%2F58%20passing-brightgreen)]()
-[![Status](https://img.shields.io/badge/status-pre--1.0-orange)]()
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)]()
 
 </div>
 

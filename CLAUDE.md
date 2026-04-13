@@ -9,7 +9,7 @@ Snakemake pipeline for quality assessment, taxonomic classification, and species
 - **CLI**: `meta-pipeline-MAGDrep`
 - **Local dir**: Note the local directory is still named `meta-pipeline-MAGQC` (pre-rename), but the repo/package/CLI are all `MAGDrep`.
 
-## Current State (2026-04-12)
+## Current State (2026-04-12) — v1.0.0
 
 ### What's built and working
 
