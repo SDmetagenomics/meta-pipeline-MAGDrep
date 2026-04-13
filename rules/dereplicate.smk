@@ -5,6 +5,8 @@ rule skani_triangle:
     output:
         edge_list=str(OUTDIR / "dereplicate" / "skani_edges.tsv"),
         genome_list=str(OUTDIR / "dereplicate" / "genome_list.txt"),
+    benchmark:
+        str(OUTDIR / "benchmarks" / "skani_triangle.tsv")
     threads: 64
     resources:
         mem_mb=64000
@@ -27,16 +29,24 @@ rule dereplicate_cluster:
     output:
         clusters=str(OUTDIR / "species_clusters.tsv"),
         derep_report=str(OUTDIR / "dereplicated_report.tsv"),
+    benchmark:
+        str(OUTDIR / "benchmarks" / "dereplicate_cluster.tsv")
     threads: 1
     params:
         derep_cfg=config.get("dereplicate", {}),
-        quality_cfg=config.get("quality_filter", {}),
-    shell:
-        "python scripts/dereplicate.py cluster "
-        "--edge-list {input.edge_list} "
-        "--filtered-report {input.filtered_report} "
-        "--output-clusters {output.clusters} "
-        "--output-derep-report {output.derep_report} "
-        "--ani-threshold {params.derep_cfg[ani_threshold]} "
-        "--min-af {params.derep_cfg[min_af]} "
-        "--score-weights '{params.derep_cfg[score_weights]}'"
+    run:
+        import json, subprocess
+        cfg = params.derep_cfg
+        # Coerce values to float — Snakemake's config passing can stringify them.
+        weights = {k: float(v) for k, v in cfg.get("score_weights", {}).items()}
+        cmd = [
+            "python", "scripts/dereplicate.py", "cluster",
+            "--edge-list", input.edge_list,
+            "--filtered-report", input.filtered_report,
+            "--output-clusters", output.clusters,
+            "--output-derep-report", output.derep_report,
+            "--ani-threshold", str(float(cfg.get("ani_threshold", 95.0))),
+            "--min-af", str(float(cfg.get("min_af", 10.0))),
+            "--score-weights", json.dumps(weights),
+        ]
+        subprocess.run(cmd, check=True)
