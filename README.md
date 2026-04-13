@@ -8,7 +8,7 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-9.16-039475?logo=snakemake&logoColor=white)](https://snakemake.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-58%2F58%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-1.0.1-brightgreen)]()
 
 </div>
 
@@ -90,7 +90,106 @@ results/
 
 ---
 
-## CLI cheat sheet
+## Putting databases anywhere you want
+
+By default, databases live in `databases/` inside the project. To point at a
+shared lab location instead, set the `MAGDREP_DB_DIR` environment variable:
+
+```bash
+# One-time: set in your shell profile
+export MAGDREP_DB_DIR=/shared/lab/meta-pipeline-MAGDrep-db
+
+# Now every command finds them automatically
+meta-pipeline-MAGDrep db update     # downloads to $MAGDREP_DB_DIR
+meta-pipeline-MAGDrep db status     # checks $MAGDREP_DB_DIR
+meta-pipeline-MAGDrep qc -i mags/ -o results/   # uses $MAGDREP_DB_DIR
+```
+
+Resolution order: `--db-dir` flag > `$MAGDREP_DB_DIR` > project `databases/`.
+
+---
+
+## CLI reference
+
+### `meta-pipeline-MAGDrep`
+
+```
+Usage: meta-pipeline-MAGDrep [OPTIONS] COMMAND [ARGS]...
+
+  meta-pipeline-MAGDrep: quality assessment and taxonomy of MAGs at scale.
+
+Options:
+  --version  Show the version and exit.
+  --help     Show this message and exit.
+
+Commands:
+  benchmark  Summarize step timing from a completed pipeline run.
+  db         Manage reference databases.
+  qc         Run quality assessment on a directory of MAG FASTA files.
+```
+
+### `qc` — run the pipeline
+
+```
+Usage: meta-pipeline-MAGDrep qc [OPTIONS]
+
+Options:
+  -i, --input DIRECTORY           Directory of input MAG FASTA files.  [required]
+  -o, --output PATH               Output directory.  [required]
+  --profile [gcp|local|slurm]     Execution profile.  [default: local]
+  --steps TEXT                    Comma-separated steps to run (e.g. checkm2,gtdbtk). Default: all.
+  --skip TEXT                     Comma-separated steps to skip (e.g. gtdbtk).
+  --config PATH                   Path to a custom config YAML.
+  --dry-run                       Show what would be run without executing.
+  -j, --jobs INTEGER              Maximum parallel jobs. Overrides config.
+  --cluster-cpus INTEGER          CPUs per standard compute node for SLURM/GCP.
+                                  Auto-detected from sinfo if not set.
+  --cluster-mem-gb INTEGER        Memory (GB) per standard compute node.
+                                  Auto-detected from sinfo if not set.
+  --cluster-mem-node-cpus INTEGER CPUs on memory-partition nodes (for GTDB-Tk).
+                                  Defaults to --cluster-cpus.
+  --cluster-mem-node-mem-gb INTEGER
+                                  Memory (GB) on memory-partition nodes.
+                                  Defaults to --cluster-mem-gb.
+  --slurm-standard-partition TEXT SLURM partition for CheckM2 and most rules.  [default: normal]
+  --slurm-memory-partition TEXT   SLURM partition for GTDB-Tk (high-memory).
+                                  Defaults to --slurm-standard-partition.
+  --help                          Show this message and exit.
+```
+
+### `db update` — download reference databases
+
+```
+Usage: meta-pipeline-MAGDrep db update [OPTIONS]
+
+Options:
+  --db-dir PATH  Directory to download databases into.
+                 Defaults to $MAGDREP_DB_DIR env var or ./databases/.
+  --only TEXT    Download only this database (checkm2 or gtdbtk).
+  --force        Re-download even if already present.
+  --help         Show this message and exit.
+```
+
+### `db status` — check what's installed
+
+```
+Usage: meta-pipeline-MAGDrep db status [OPTIONS]
+
+Options:
+  --db-dir PATH  Database directory to inspect.
+                 Defaults to $MAGDREP_DB_DIR env var or ./databases/.
+  --help         Show this message and exit.
+```
+
+### `benchmark` — summarize step timing
+
+```
+Usage: meta-pipeline-MAGDrep benchmark [OPTIONS] RESULTS_DIR
+
+  Summarize step timing from a completed pipeline run.
+```
+
+### Common patterns
 
 ```bash
 # Run with a custom config

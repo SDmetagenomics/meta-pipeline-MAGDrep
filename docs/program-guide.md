@@ -164,25 +164,35 @@ All databases ready.
 
 ### Using a shared lab database directory
 
-Point `db_dir` at a shared filesystem in your config:
+The cleanest way is the **`MAGDREP_DB_DIR` environment variable**:
+
+```bash
+# In your shell profile (~/.bashrc, ~/.zshrc, lab module)
+export MAGDREP_DB_DIR=/shared/lab/meta-pipeline-MAGDrep-db
+```
+
+Then every command — `qc`, `db update`, `db status` — uses that location
+automatically:
+
+```bash
+meta-pipeline-MAGDrep db update      # downloads to $MAGDREP_DB_DIR
+meta-pipeline-MAGDrep db status      # checks $MAGDREP_DB_DIR
+meta-pipeline-MAGDrep qc -i mags/ -o results/   # reads from $MAGDREP_DB_DIR
+```
+
+Resolution priority: `--db-dir` flag (per-command) > `$MAGDREP_DB_DIR`
+(per-shell) > project-local `databases/` (default).
+
+You can also point individual tool databases at custom locations via
+config:
 
 ```yaml
 # my-config.yaml
-db_dir: /shared/lab/databases
+checkm2_db_path: /shared/lab/databases/checkm2-v1.1
+gtdbtk_db_path:  /shared/lab/databases/gtdb-r226
 ```
 
-Then:
-
-```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --config my-config.yaml
-```
-
-Or set individual paths:
-
-```yaml
-checkm2_db_path: /shared/lab/databases/checkm2
-gtdbtk_db_path:  /shared/lab/databases/gtdbtk
-```
+Useful when the lab maintains multiple GTDB releases side by side.
 
 ### Database versions
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import copy
+import os
 from pathlib import Path
 import yaml
 
@@ -7,6 +8,29 @@ VALID_STEPS = {"genome_stats", "checkm2", "gtdbtk", "dereplicate"}
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _DEFAULT_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
+
+# Environment variable for a shared/external database directory.
+# Set to the absolute path of your `meta-pipeline-MAGDrep-db` folder:
+#   export MAGDREP_DB_DIR=/shared/lab/meta-pipeline-MAGDrep-db
+DB_DIR_ENV_VAR = "MAGDREP_DB_DIR"
+
+
+def resolve_db_dir(explicit: str | Path | None = None) -> Path:
+    """Resolve the database directory with clear priority.
+
+    1. Explicit argument (typically from --db-dir flag or config file)
+    2. MAGDREP_DB_DIR environment variable
+    3. Project-local "databases/" directory (default)
+    """
+    if explicit:
+        p = Path(explicit)
+        return p if p.is_absolute() else _PROJECT_ROOT / p
+
+    env_val = os.environ.get(DB_DIR_ENV_VAR)
+    if env_val:
+        return Path(env_val).expanduser()
+
+    return _PROJECT_ROOT / "databases"
 
 
 class ConfigError(ValueError):
@@ -67,10 +91,12 @@ def load_and_merge_config(
 
     validate_config(cfg)
 
-    # Resolve db_dir to absolute path relative to project root
-    db_dir = Path(cfg.get("db_dir", "databases"))
-    if not db_dir.is_absolute():
-        db_dir = _PROJECT_ROOT / db_dir
+    # Resolve db_dir: explicit config > MAGDREP_DB_DIR env var > default "databases/"
+    explicit = cfg.get("db_dir")
+    # Treat the literal shipped default as "not explicit" so the env var wins
+    if explicit == "databases":
+        explicit = None
+    db_dir = resolve_db_dir(explicit)
     cfg["db_dir"] = str(db_dir)
 
     # Resolve per-tool database paths: if null, default to db_dir/<tool>

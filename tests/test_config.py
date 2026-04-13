@@ -4,6 +4,7 @@ from pathlib import Path
 from meta_pipeline_magdrep.config import (
     load_config, validate_config, merge_config,
     load_and_merge_config, ConfigError, VALID_STEPS,
+    resolve_db_dir, DB_DIR_ENV_VAR,
 )
 
 CONFIG_YAML = Path(__file__).parent.parent / "config" / "config.yaml"
@@ -73,3 +74,32 @@ def test_load_and_merge_config_returns_validated():
     cfg = load_and_merge_config()
     assert "steps" in cfg
     assert "quality_filter" in cfg
+
+
+def test_resolve_db_dir_explicit_wins(monkeypatch):
+    """Explicit path beats env var beats default."""
+    monkeypatch.setenv(DB_DIR_ENV_VAR, "/tmp/from-env")
+    assert str(resolve_db_dir("/tmp/from-arg")) == "/tmp/from-arg"
+
+
+def test_resolve_db_dir_env_var(monkeypatch):
+    """Env var is used when no explicit path is given."""
+    monkeypatch.setenv(DB_DIR_ENV_VAR, "/tmp/shared-db-location")
+    assert str(resolve_db_dir()) == "/tmp/shared-db-location"
+
+
+def test_resolve_db_dir_default(monkeypatch):
+    """Falls back to project-relative databases/ when nothing else is set."""
+    monkeypatch.delenv(DB_DIR_ENV_VAR, raising=False)
+    result = resolve_db_dir()
+    assert str(result).endswith("databases")
+
+
+def test_load_and_merge_config_honors_env_var(monkeypatch):
+    """load_and_merge_config should pick up MAGDREP_DB_DIR when config
+    doesn't override db_dir explicitly."""
+    monkeypatch.setenv(DB_DIR_ENV_VAR, "/tmp/lab-db")
+    cfg = load_and_merge_config()
+    assert cfg["db_dir"] == "/tmp/lab-db"
+    assert cfg["checkm2_db_path"] == "/tmp/lab-db/checkm2"
+    assert cfg["gtdbtk_db_path"] == "/tmp/lab-db/gtdbtk"

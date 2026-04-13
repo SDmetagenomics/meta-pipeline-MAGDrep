@@ -1,9 +1,13 @@
 from __future__ import annotations
+import os
 import sys
 from pathlib import Path
 import click
 from meta_pipeline_magdrep import __version__
-from meta_pipeline_magdrep.config import load_and_merge_config, VALID_STEPS, ConfigError
+from meta_pipeline_magdrep.config import (
+    load_and_merge_config, VALID_STEPS, ConfigError,
+    resolve_db_dir, DB_DIR_ENV_VAR,
+)
 from meta_pipeline_magdrep.resources import (
     detect_resources,
     resolve_execution_resources,
@@ -14,6 +18,16 @@ from meta_pipeline_magdrep.resources import (
 )
 
 VALID_PROFILES = {"local", "slurm", "gcp"}
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+
+def _ensure_databases_on_path():
+    """Add the project root to sys.path so `from databases.download` works
+    regardless of the current working directory."""
+    pr = str(_PROJECT_ROOT)
+    if pr not in sys.path:
+        sys.path.insert(0, pr)
 
 
 @click.group()
@@ -205,21 +219,21 @@ def db():
 
 
 @db.command("update")
-@click.option("--db-dir", default="databases", show_default=True,
+@click.option("--db-dir", default=None,
               type=click.Path(path_type=Path),
-              help="Directory to download databases into.")
+              help=f"Directory to download databases into. "
+                   f"Defaults to ${DB_DIR_ENV_VAR} env var or ./databases/.")
 @click.option("--only", default=None,
               help="Download only this database (checkm2 or gtdbtk).")
 @click.option("--force", is_flag=True, default=False,
               help="Re-download even if already present.")
 def db_update(db_dir, only, force):
     """Download required databases (CheckM2, GTDB-Tk)."""
+    _ensure_databases_on_path()
     from databases.download import download_all_databases, _DOWNLOADERS, DATABASES
 
-    project_root = Path(__file__).parent.parent.parent
-    db_path = Path(db_dir)
-    if not db_path.is_absolute():
-        db_path = project_root / db_path
+    db_path = resolve_db_dir(db_dir)
+    click.echo(f"Database directory: {db_path}\n")
 
     if only:
         if only not in _DOWNLOADERS:
@@ -236,18 +250,21 @@ def db_update(db_dir, only, force):
 
 
 @db.command("status")
-@click.option("--db-dir", default="databases", show_default=True,
+@click.option("--db-dir", default=None,
               type=click.Path(path_type=Path),
-              help="Database directory to inspect.")
+              help=f"Database directory to inspect. "
+                   f"Defaults to ${DB_DIR_ENV_VAR} env var or ./databases/.")
 def db_status(db_dir):
     """Show installed database versions."""
+    _ensure_databases_on_path()
     from databases.download import database_status
 
-    project_root = Path(__file__).parent.parent.parent
-    db_path = Path(db_dir)
-    if not db_path.is_absolute():
-        db_path = project_root / db_path
-    click.echo(f"Database directory: {db_path}\n")
+    db_path = resolve_db_dir(db_dir)
+    click.echo(f"Database directory: {db_path}")
+    env_val = os.environ.get(DB_DIR_ENV_VAR)
+    if db_dir is None and env_val:
+        click.echo(f"  (source: ${DB_DIR_ENV_VAR})")
+    click.echo("")
 
     status = database_status(db_path)
     for name, info in status.items():
