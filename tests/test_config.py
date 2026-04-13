@@ -10,7 +10,7 @@ CONFIG_YAML = Path(__file__).parent.parent / "config" / "config.yaml"
 
 
 def test_valid_steps_contains_all_expected():
-    expected = {"genome_stats", "checkm2", "gunc", "gtdbtk", "dereplicate"}
+    expected = {"genome_stats", "checkm2", "gtdbtk", "dereplicate"}
     assert VALID_STEPS == expected
 
 
@@ -50,7 +50,7 @@ def test_merge_config_nested_merge():
 
 def test_validate_config_valid():
     cfg = {
-        "steps": ["genome_stats", "checkm2", "gunc", "gtdbtk", "dereplicate"],
+        "steps": ["genome_stats", "checkm2", "gtdbtk", "dereplicate"],
         "batch_size": 1000,
         "fasta_extensions": [".fna"],
     }

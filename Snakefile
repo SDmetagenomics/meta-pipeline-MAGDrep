@@ -24,9 +24,6 @@ include: "rules/aggregate.smk"
 if "checkm2" in STEPS:
     include: "rules/checkm2.smk"
 
-if "gunc" in STEPS:
-    include: "rules/gunc.smk"
-
 if "gtdbtk" in STEPS:
     include: "rules/gtdbtk.smk"
 

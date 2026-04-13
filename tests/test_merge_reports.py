@@ -7,50 +7,34 @@ DEFAULT_QUALITY_CFG = {
     "medium_completeness": 60.0,
     "medium_contamination": 10.0,
     "min_quality_score": 50.0,
-    "gunc_css_threshold": 0.45,
     "default_filter": "medium_quality",
 }
 
 
 def test_assign_high_quality():
-    row = {"completeness": 95.0, "contamination": 1.0, "pass_gunc": True}
+    row = {"completeness": 95.0, "contamination": 1.0}
     assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "high_quality"
 
 
 def test_assign_medium_quality():
-    row = {"completeness": 75.0, "contamination": 3.0, "pass_gunc": True}
+    row = {"completeness": 75.0, "contamination": 3.0}
     assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "medium_quality"
 
 
-def test_assign_medium_chimeric():
-    row = {"completeness": 75.0, "contamination": 3.0, "pass_gunc": False}
-    assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "medium_chimeric"
-
-
 def test_assign_low_quality():
-    row = {"completeness": 40.0, "contamination": 2.0, "pass_gunc": True}
+    row = {"completeness": 40.0, "contamination": 2.0}
     assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "low_quality"
 
 
-def test_assign_low_chimeric():
-    row = {"completeness": 40.0, "contamination": 2.0, "pass_gunc": False}
-    assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "low_chimeric"
-
-
 def test_assign_high_contamination_is_low():
-    row = {"completeness": 95.0, "contamination": 12.0, "pass_gunc": True}
+    row = {"completeness": 95.0, "contamination": 12.0}
     assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "low_quality"
 
 
 def test_assign_quality_score_below_threshold():
     """Completeness 65, contamination 5 -> qscore=40 < 50 -> low_quality."""
-    row = {"completeness": 65.0, "contamination": 5.0, "pass_gunc": True}
+    row = {"completeness": 65.0, "contamination": 5.0}
     assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "low_quality"
-
-
-def test_assign_missing_gunc_defaults_to_pass():
-    row = {"completeness": 95.0, "contamination": 1.0}
-    assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "high_quality"
 
 
 def test_merge_all_reports(tmp_path):
@@ -70,19 +54,12 @@ def test_merge_all_reports(tmp_path):
         "mag_002\t55.0\t8.0\tNeural Network\t11\n"
     )
 
-    (tmp_path / "gunc_chimerism.tsv").write_text(
-        "mag_id\tcss\trrs\tcontamination_portion\ttaxonomic_level\tpass_gunc\n"
-        "mag_001\t0.1\t0.9\t0.05\tgenus\tTrue\n"
-        "mag_002\t0.6\t0.5\t0.3\tphylum\tFalse\n"
-    )
-
     combined = tmp_path / "combined_report.tsv"
     filtered = tmp_path / "filtered_report.tsv"
 
     merge_all_reports(
         stats_dir=str(indiv),
         checkm2_path=str(tmp_path / "checkm2_quality.tsv"),
-        gunc_path=str(tmp_path / "gunc_chimerism.tsv"),
         gtdbtk_path=None,
         output_combined=str(combined),
         output_filtered=str(filtered),

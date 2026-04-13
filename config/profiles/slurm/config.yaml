@@ -26,9 +26,6 @@ set-resources:
   checkm2_batch:
     runtime: 240
     mem_mb: 32000
-  gunc_batch:
-    runtime: 120
-    mem_mb: 32000
   gtdbtk_batch:
     runtime: 480
     mem_mb: 120000

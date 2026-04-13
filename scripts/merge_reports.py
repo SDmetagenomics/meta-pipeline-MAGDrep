@@ -1,6 +1,5 @@
-"""Merge genome_stats + CheckM2 + GUNC + GTDB-Tk reports and assign quality tiers."""
+"""Merge genome_stats + CheckM2 + GTDB-Tk reports and assign quality tiers."""
 from __future__ import annotations
-import ast
 from pathlib import Path
 
 
@@ -29,30 +28,18 @@ def _to_float(val, default=None):
         return default
 
 
-def _to_bool(val, default=True):
-    """Safely convert a value to bool."""
-    if val is None or val == "":
-        return default
-    if isinstance(val, bool):
-        return val
-    return str(val).lower() in ("true", "1", "yes")
-
-
 def assign_quality_tier(row: dict, cfg: dict) -> str:
     """
-    Assign a quality tier to a genome based on CheckM2 and GUNC results.
+    Assign a quality tier to a genome based on CheckM2 results.
 
     Tiers (in order of precedence):
-      high_quality     : comp >= 90, contam < 5,  qscore >= 50, GUNC pass
-      medium_quality   : comp >= 60, contam < 10, qscore >= 50, GUNC pass
-      medium_chimeric  : meets medium_quality thresholds but GUNC flagged chimeric
-      low_quality      : comp < 60 OR contam >= 10 OR qscore < 50
-      low_chimeric     : meets low_quality AND GUNC flagged chimeric
+      high_quality   : comp >= 90, contam < 5,  qscore >= 50
+      medium_quality : comp >= 60, contam < 10, qscore >= 50
+      low_quality    : everything else
     """
     comp = _to_float(row.get("completeness"), 0)
     contam = _to_float(row.get("contamination"), 100)
     qscore = comp - 5 * contam
-    gunc_pass = _to_bool(row.get("pass_gunc"), True)
 
     is_high = (
         comp >= float(cfg["high_completeness"])
@@ -65,14 +52,10 @@ def assign_quality_tier(row: dict, cfg: dict) -> str:
         and qscore >= float(cfg["min_quality_score"])
     )
 
-    if is_high and gunc_pass:
+    if is_high:
         return "high_quality"
-    elif is_medium and gunc_pass:
+    elif is_medium:
         return "medium_quality"
-    elif is_medium and not gunc_pass:
-        return "medium_chimeric"
-    elif not gunc_pass:
-        return "low_chimeric"
     else:
         return "low_quality"
 
@@ -86,7 +69,6 @@ _FILTER_TIERS = {
 def merge_all_reports(
     stats_dir: str,
     checkm2_path: str | None,
-    gunc_path: str | None,
     gtdbtk_path: str | None,
     output_combined: str,
     output_filtered: str,
@@ -114,38 +96,25 @@ def merge_all_reports(
             if mid in data:
                 data[mid].update(row)
 
-    # 3. Left-join GUNC
-    if gunc_path:
-        for row in _read_tsv(gunc_path):
-            mid = row.get("mag_id", "")
-            if mid in data:
-                data[mid].update(row)
-
-    # 4. Left-join GTDB-Tk
+    # 3. Left-join GTDB-Tk
     if gtdbtk_path:
         for row in _read_tsv(gtdbtk_path):
             mid = row.get("mag_id", "")
             if mid in data:
                 data[mid].update(row)
 
-    # 5. Compute derived columns and assign quality tiers
+    # 4. Compute derived columns and assign quality tiers
     for mid, row in data.items():
         comp = _to_float(row.get("completeness"), 0)
         contam = _to_float(row.get("contamination"), 0)
         row["quality_score"] = round(comp - 5 * contam, 2)
         row["quality_tier"] = assign_quality_tier(row, quality_cfg)
 
-    # 6. Remap GUNC column name
-    for row in data.values():
-        if "taxonomic_level" in row and "gunc_taxonomic_level" not in row:
-            row["gunc_taxonomic_level"] = row.pop("taxonomic_level")
-
-    # 7. Define output column order
+    # 5. Define output column order
     columns = [
         "mag_id", "total_length_bp", "gc_percent", "contig_count", "n50_bp",
         "largest_contig_bp", "completeness", "contamination",
-        "completeness_model_used", "quality_score", "css", "rrs",
-        "contamination_portion", "gunc_taxonomic_level", "pass_gunc",
+        "completeness_model_used", "quality_score",
         "domain", "phylum", "class", "order", "family", "genus", "species",
         "classification", "fastani_reference", "fastani_ani", "fastani_af",
         "classification_method", "quality_tier",
@@ -155,11 +124,11 @@ def merge_all_reports(
         available_cols.update(row.keys())
     output_cols = [c for c in columns if c in available_cols or c in ("quality_score", "quality_tier")]
 
-    # 8. Write combined report
+    # 6. Write combined report
     rows_sorted = sorted(data.values(), key=lambda r: r.get("mag_id", ""))
     _write_tsv(rows_sorted, output_cols, output_combined)
 
-    # 9. Write filtered report
+    # 7. Write filtered report
     filter_level = quality_cfg.get("default_filter", "medium_quality")
     passing_tiers = _FILTER_TIERS.get(filter_level, {"high_quality", "medium_quality"})
     filtered_rows = [r for r in rows_sorted if r.get("quality_tier") in passing_tiers]
@@ -182,7 +151,6 @@ DEFAULT_QUALITY_CFG = {
     "medium_completeness": 60.0,
     "medium_contamination": 10.0,
     "min_quality_score": 50.0,
-    "gunc_css_threshold": 0.45,
     "default_filter": "medium_quality",
 }
 
@@ -194,7 +162,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Merge QC reports and assign quality tiers")
     parser.add_argument("--stats-dir", required=True)
     parser.add_argument("--checkm2", default=None)
-    parser.add_argument("--gunc", default=None)
     parser.add_argument("--gtdbtk", default=None)
     parser.add_argument("--output-combined", required=True)
     parser.add_argument("--output-filtered", required=True)
@@ -202,20 +169,17 @@ if __name__ == "__main__":
                         help="JSON string or path to YAML config file")
     args = parser.parse_args()
 
-    # Parse quality config: try JSON string first, then YAML file, then defaults
+    # Parse quality config: try JSON string first, then fall back to defaults
     quality_cfg = DEFAULT_QUALITY_CFG.copy()
     if args.quality_config:
         try:
             quality_cfg.update(json.loads(args.quality_config))
         except (json.JSONDecodeError, TypeError):
-            # Not JSON — might be a Python repr or garbage from shell quoting.
-            # Fall back to defaults.
             pass
 
     merge_all_reports(
         stats_dir=args.stats_dir,
         checkm2_path=args.checkm2 if args.checkm2 else None,
-        gunc_path=args.gunc if args.gunc else None,
         gtdbtk_path=args.gtdbtk if args.gtdbtk else None,
         output_combined=args.output_combined,
         output_filtered=args.output_filtered,

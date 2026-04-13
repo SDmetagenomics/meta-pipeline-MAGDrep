@@ -25,15 +25,14 @@ def tmp_output_dir(tmp_path):
 def default_config():
     return {
         "outdir": "results",
-        "steps": ["genome_stats", "checkm2", "gunc", "gtdbtk", "dereplicate"],
+        "steps": ["genome_stats", "checkm2", "gtdbtk", "dereplicate"],
         "batch_size": 1000,
         "threads_per_job": 4,
         "max_parallel_jobs": 8,
         "fasta_extensions": [".fna", ".fasta", ".fa", ".fna.gz", ".fasta.gz", ".fa.gz"],
         "db_dir": "databases",
         "db_versions": {
-            "checkm2": "1.0.2",
-            "gunc": "gtdb_214",
+            "checkm2": "2.0.0",
             "gtdbtk": "r226",
         },
         "quality_filter": {
@@ -42,7 +41,6 @@ def default_config():
             "medium_completeness": 60.0,
             "medium_contamination": 10.0,
             "min_quality_score": 50.0,
-            "gunc_css_threshold": 0.45,
             "default_filter": "medium_quality",
         },
         "dereplicate": {
@@ -53,7 +51,6 @@ def default_config():
                 "w_completeness": 1.0,
                 "w_n50": 0.5,
                 "w_contam": 0.5,
-                "w_gunc": 0.5,
             },
         },
     }
