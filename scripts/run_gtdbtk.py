@@ -41,8 +41,13 @@ def _parse_summary_tsv(path: Path) -> list[dict]:
                 except (ValueError, TypeError):
                     return None
 
+            # Strip MAG_ prefix added to avoid GTDB-Tk reference ID collisions
+            genome_id = raw["user_genome"]
+            if genome_id.startswith("MAG_"):
+                genome_id = genome_id[4:]
+
             rows.append({
-                "mag_id": raw["user_genome"],
+                "mag_id": genome_id,
                 **ranks,
                 "classification": raw.get("classification", ""),
                 "fastani_reference": raw.get("fastani_reference", ""),
@@ -91,6 +96,7 @@ def run_gtdbtk(
     input_dir: str, output_dir: str, output_tsv: str,
     threads: int = 64, pplacer_cpus: int = 1,
     skip_ani_screen: bool = False,
+    db_path: str | None = None,
 ) -> None:
     """Run GTDB-Tk classify_wf on a directory of genomes."""
     cmd = [
@@ -109,7 +115,12 @@ def run_gtdbtk(
             cmd.extend(["--extension", ext.lstrip(".")])
             break
 
-    subprocess.run(cmd, check=True)
+    env = None
+    if db_path:
+        import os
+        env = {**os.environ, "GTDBTK_DATA_PATH": db_path}
+
+    subprocess.run(cmd, check=True, env=env)
 
     out_path = Path(output_dir)
     bac = out_path / "classify" / "gtdbtk.bac120.summary.tsv"
@@ -130,4 +141,5 @@ if __name__ == "__main__":
         threads=int(sys.argv[4]),
         pplacer_cpus=int(sys.argv[5]) if len(sys.argv) > 5 else 1,
         skip_ani_screen=sys.argv[6].lower() == "true" if len(sys.argv) > 6 else False,
+        db_path=sys.argv[7] if len(sys.argv) > 7 else None,
     )

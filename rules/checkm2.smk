@@ -16,11 +16,14 @@ rule checkm2_batch:
         batch_dir=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "input")
     output:
         results=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "quality_report.tsv")
+    benchmark:
+        str(OUTDIR / "benchmarks" / "checkm2" / "{batch_id}.tsv")
     threads: 16
     params:
-        outdir=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "output")
+        outdir=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "output"),
+        db_path=config.get("checkm2_db_path", ""),
     shell:
-        "python scripts/run_checkm2.py {input.batch_dir} {params.outdir} {output.results} {threads}"
+        "python scripts/run_checkm2.py {input.batch_dir} {params.outdir} {output.results} {threads} {params.db_path}"
 
 
 rule checkm2_merge:

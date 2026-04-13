@@ -3,7 +3,7 @@ import copy
 from pathlib import Path
 import yaml
 
-VALID_STEPS = {"genome_stats", "checkm2", "gunc", "gtdbtk", "dereplicate"}
+VALID_STEPS = {"genome_stats", "checkm2", "gtdbtk", "dereplicate"}
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _DEFAULT_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
@@ -70,6 +70,18 @@ def load_and_merge_config(
     # Resolve db_dir to absolute path relative to project root
     db_dir = Path(cfg.get("db_dir", "databases"))
     if not db_dir.is_absolute():
-        cfg["db_dir"] = str(_PROJECT_ROOT / db_dir)
+        db_dir = _PROJECT_ROOT / db_dir
+    cfg["db_dir"] = str(db_dir)
+
+    # Resolve per-tool database paths: if null, default to db_dir/<tool>
+    for tool in ("checkm2", "gtdbtk"):
+        key = f"{tool}_db_path"
+        val = cfg.get(key)
+        if val:
+            p = Path(val)
+            if not p.is_absolute():
+                cfg[key] = str(_PROJECT_ROOT / p)
+        else:
+            cfg[key] = str(db_dir / tool)
 
     return cfg

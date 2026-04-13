@@ -4,7 +4,7 @@ from pathlib import Path
 import click
 from meta_pipeline_magdrep import __version__
 from meta_pipeline_magdrep.config import load_and_merge_config, VALID_STEPS, ConfigError
-from meta_pipeline_magdrep.resources import detect_resources
+from meta_pipeline_magdrep.resources import detect_resources, compute_gtdbtk_pplacer_cpus
 
 VALID_PROFILES = {"local", "slurm"}
 
@@ -29,7 +29,7 @@ def main():
 @click.option("--steps", default=None,
               help="Comma-separated steps to run (e.g. checkm2,gtdbtk). Default: all.")
 @click.option("--skip", default=None,
-              help="Comma-separated steps to skip (e.g. gunc).")
+              help="Comma-separated steps to skip (e.g. gtdbtk).")
 @click.option("--config", "config_file", default=None,
               type=click.Path(exists=True, path_type=Path),
               help="Path to a custom config YAML.")
@@ -71,6 +71,19 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs):
     if cfg["max_parallel_jobs"] == "auto":
         cfg["max_parallel_jobs"] = max(1, resources.cpu_count // cfg["threads_per_job"])
 
+    # GTDB-Tk: use all cores and auto-scale pplacer_cpus by available memory
+    cfg.setdefault("gtdbtk", {})
+    cfg["gtdbtk"].setdefault("threads", resources.cpu_count)
+    if cfg["gtdbtk"].get("pplacer_cpus", "auto") == "auto":
+        cfg["gtdbtk"]["pplacer_cpus"] = compute_gtdbtk_pplacer_cpus(
+            resources.mem_gb, max_cpus=resources.cpu_count
+        )
+    click.echo(
+        f"Detected: {resources.cpu_count} CPUs, {resources.mem_gb:.0f} GB RAM. "
+        f"GTDB-Tk will use --cpus={cfg['gtdbtk']['threads']} "
+        f"--pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+    )
+
     from meta_pipeline_magdrep.runner import run_snakemake
     run_snakemake(
         input_dir=input_dir,
@@ -90,15 +103,31 @@ def db():
 @click.option("--db-dir", default="databases", show_default=True,
               type=click.Path(path_type=Path),
               help="Directory to download databases into.")
+@click.option("--only", default=None,
+              help="Download only this database (checkm2 or gtdbtk).")
 @click.option("--force", is_flag=True, default=False,
               help="Re-download even if already present.")
-def db_update(db_dir, force):
-    """Download required databases (CheckM2, GUNC, GTDB-Tk)."""
-    click.echo("Database download not yet implemented.")
-    click.echo("Please download manually:")
-    click.echo("  CheckM2: checkm2 database --download --path <db_dir>")
-    click.echo("  GUNC: gunc download_db <db_dir> -db gtdb_214")
-    click.echo("  GTDB-Tk: download-db.sh <db_dir>")
+def db_update(db_dir, only, force):
+    """Download required databases (CheckM2, GTDB-Tk)."""
+    from databases.download import download_all_databases, _DOWNLOADERS, DATABASES
+
+    project_root = Path(__file__).parent.parent.parent
+    db_path = Path(db_dir)
+    if not db_path.is_absolute():
+        db_path = project_root / db_path
+
+    if only:
+        if only not in _DOWNLOADERS:
+            click.echo(f"Error: Unknown database '{only}'. Choose from: {list(_DOWNLOADERS)}", err=True)
+            sys.exit(1)
+        meta = DATABASES[only]
+        click.echo(f"Downloading {meta['display_name']}...")
+        _DOWNLOADERS[only](db_path, force=force)
+    else:
+        click.echo("Downloading all databases...")
+        download_all_databases(db_path, force=force)
+
+    click.echo("\nDone. Run 'meta-pipeline-MAGDrep db status' to verify.")
 
 
 @db.command("status")
@@ -107,17 +136,93 @@ def db_update(db_dir, force):
               help="Database directory to inspect.")
 def db_status(db_dir):
     """Show installed database versions."""
+    from databases.download import database_status
+
     project_root = Path(__file__).parent.parent.parent
     db_path = Path(db_dir)
     if not db_path.is_absolute():
         db_path = project_root / db_path
-    click.echo(f"Checking databases in: {db_path}")
-    if not db_path.exists():
-        click.echo("  No databases directory found.")
+    click.echo(f"Database directory: {db_path}\n")
+
+    status = database_status(db_path)
+    for name, info in status.items():
+        icon = "OK" if info["present"] else "MISSING"
+        click.echo(f"  [{icon:>7}]  {info['display_name']:<20}  {info['size_hint']}")
+        if not info["present"] and info["directory_exists"]:
+            click.echo(f"           Directory exists but download incomplete — run db update --only {name}")
+
+    all_ok = all(s["present"] for s in status.values())
+    if all_ok:
+        click.echo("\nAll databases ready.")
+    else:
+        missing = [n for n, s in status.items() if not s["present"]]
+        click.echo(f"\nMissing: {', '.join(missing)}. Run: meta-pipeline-MAGDrep db update")
+
+
+@main.command()
+@click.argument("results_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
+def benchmark(results_dir):
+    """Summarize step timing from a completed pipeline run."""
+    bench_dir = Path(results_dir) / "benchmarks"
+    if not bench_dir.exists():
+        click.echo(f"No benchmarks directory found at {bench_dir}", err=True)
+        sys.exit(1)
+
+    # Each benchmark TSV has a header: s h:m:s max_rss max_vms max_uss max_pss io_in io_out mean_load cpu_time
+    def parse_bench(p: Path) -> dict | None:
+        try:
+            with open(p) as f:
+                header = f.readline().strip().split("\t")
+                values = f.readline().strip().split("\t")
+                if len(values) < len(header):
+                    return None
+                row = dict(zip(header, values))
+                return {
+                    "seconds": float(row.get("s", 0)),
+                    "max_rss_mb": float(row.get("max_rss", 0) or 0),
+                    "cpu_time": float(row.get("cpu_time", 0) or 0),
+                }
+        except (ValueError, IOError):
+            return None
+
+    def fmt_time(seconds: float) -> str:
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        if seconds < 3600:
+            return f"{seconds / 60:.1f}m"
+        return f"{seconds / 3600:.2f}h"
+
+    # Group benchmarks by step (directory name)
+    steps: dict[str, list[dict]] = {}
+    for tsv in sorted(bench_dir.rglob("*.tsv")):
+        rel = tsv.relative_to(bench_dir)
+        step = rel.parts[0] if len(rel.parts) > 1 else rel.stem
+        data = parse_bench(tsv)
+        if data:
+            data["batch"] = rel.stem
+            steps.setdefault(step, []).append(data)
+
+    if not steps:
+        click.echo("No benchmark data found.", err=True)
         return
-    for child in sorted(db_path.iterdir()):
-        if child.is_dir():
-            click.echo(f"  {child.name}: present")
+
+    click.echo(f"{'Step':<22} {'Jobs':>5} {'Total':>8} {'Avg':>8} {'Max':>8} {'Max RSS':>10}")
+    click.echo("-" * 68)
+    grand_total = 0.0
+    for step in sorted(steps):
+        jobs = steps[step]
+        seconds = [j["seconds"] for j in jobs]
+        total = sum(seconds)
+        grand_total += total
+        avg = total / len(seconds)
+        mx = max(seconds)
+        max_rss = max(j["max_rss_mb"] for j in jobs)
+        click.echo(
+            f"{step:<22} {len(jobs):>5} {fmt_time(total):>8} {fmt_time(avg):>8} "
+            f"{fmt_time(mx):>8} {max_rss:>8.0f} MB"
+        )
+    click.echo("-" * 68)
+    click.echo(f"{'Total (sum of step wall times)':<42} {fmt_time(grand_total):>8}")
 
 
 if __name__ == "__main__":
