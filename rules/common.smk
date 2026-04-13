@@ -23,29 +23,29 @@ def cfg_nested_int(section, key, default):
     return _coerce_int(sect.get(key, default), default)
 
 
-def discover_mag_ids(input_dir):
-    """Return sorted list of MAG IDs from FASTA files in input_dir."""
-    patterns = ["*.fasta", "*.fa", "*.fna", "*.fasta.gz", "*.fa.gz", "*.fna.gz"]
-    paths = []
-    for pattern in patterns:
-        paths.extend(Path(input_dir).glob(pattern))
-    ids = []
-    for p in paths:
-        name = p.name
-        for suffix in (".fasta.gz", ".fa.gz", ".fna.gz", ".fasta", ".fna", ".fa"):
-            if name.endswith(suffix):
-                ids.append(name[: -len(suffix)])
-                break
-    return sorted(set(ids))
+from meta_pipeline_magdrep.inputs import build_mag_path_map
+
+_MAG_PATH_CACHE: dict = {}
 
 
-def mag_fasta(input_dir, mag_id):
-    """Return path to FASTA file for a given MAG ID."""
-    for suffix in (".fna", ".fasta", ".fa", ".fna.gz", ".fasta.gz", ".fa.gz"):
-        candidate = Path(input_dir) / f"{mag_id}{suffix}"
-        if candidate.exists():
-            return str(candidate)
-    raise FileNotFoundError(f"No FASTA file found for MAG ID: {mag_id}")
+def _cached_map(input_source):
+    key = str(Path(input_source).resolve())
+    if key not in _MAG_PATH_CACHE:
+        _MAG_PATH_CACHE[key] = build_mag_path_map(input_source)
+    return _MAG_PATH_CACHE[key]
+
+
+def discover_mag_ids(input_source):
+    """Return sorted list of MAG IDs from a directory or path-list file."""
+    return sorted(_cached_map(input_source).keys())
+
+
+def mag_fasta(input_source, mag_id):
+    """Return absolute path to FASTA file for a given MAG ID."""
+    paths = _cached_map(input_source)
+    if mag_id not in paths:
+        raise FileNotFoundError(f"No FASTA file found for MAG ID: {mag_id}")
+    return str(paths[mag_id])
 
 
 def make_batches(mag_ids, batch_size):

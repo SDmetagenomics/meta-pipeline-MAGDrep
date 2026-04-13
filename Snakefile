@@ -10,10 +10,10 @@ CHECKM2_BATCH_SIZE = cfg_int("checkm2_batch_size", BATCH_SIZE)
 GTDBTK_BATCH_SIZE = cfg_int("gtdbtk_batch_size", BATCH_SIZE)
 STEPS = set(config.get("steps", []))
 
-# Discover MAG IDs from input directory
+# Discover MAG IDs from input source (directory or path-list file)
 MAG_IDS = discover_mag_ids(INPUT_DIR)
 if not MAG_IDS:
-    raise ValueError(f"No FASTA files found in input directory: {INPUT_DIR}")
+    raise ValueError(f"No FASTA files found from input source: {INPUT_DIR}")
 
 # Per-tool batch assignments. CheckM2 benefits from smaller batches (more
 # parallelism on cluster/cloud); GTDB-Tk benefits from larger batches

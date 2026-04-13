@@ -266,7 +266,12 @@ def run_triangle(
     filtered_report: str, input_dir: str,
     output_edges: str, output_genome_list: str, threads: int,
 ) -> None:
-    """Run skani triangle on filtered genomes."""
+    """Run skani triangle on filtered genomes.
+
+    *input_dir* may be either a directory of FASTAs or a text file with one
+    FASTA path per line. Resolution is delegated to the shared inputs module
+    so the Snakefile and this script stay in sync.
+    """
     mag_ids = []
     with open(filtered_report) as f:
         header = f.readline().strip().split("\t")
@@ -276,14 +281,9 @@ def run_triangle(
             if parts:
                 mag_ids.append(parts[mag_idx])
 
-    input_path = Path(input_dir)
-    genome_paths = []
-    for mid in mag_ids:
-        for suffix in (".fna", ".fasta", ".fa", ".fna.gz", ".fasta.gz", ".fa.gz"):
-            candidate = input_path / f"{mid}{suffix}"
-            if candidate.exists():
-                genome_paths.append(str(candidate.resolve()))
-                break
+    from meta_pipeline_magdrep.inputs import build_mag_path_map
+    path_map = build_mag_path_map(input_dir)
+    genome_paths = [str(path_map[mid]) for mid in mag_ids if mid in path_map]
 
     out_list = Path(output_genome_list)
     out_list.parent.mkdir(parents=True, exist_ok=True)

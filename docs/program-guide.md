@@ -231,6 +231,28 @@ flowchart TB
     style C fill:#f8ebe8
 ```
 
+### Input resolution
+
+`-i / --input` accepts either:
+
+- **A directory**. All `.fna`, `.fa`, `.fasta` files (optionally gzipped)
+  in the directory become MAGs.
+- **A text file** with one FASTA path per line. Paths may be absolute or
+  relative (resolved against the list file's directory). `~` expands to
+  `$HOME`. Blank lines and lines beginning with `#` are ignored.
+
+The MAG ID for each genome is the filename stem with any recognized FASTA
+suffix stripped. Two FASTAs with the same stem produce an error — rename
+one of them to avoid the collision.
+
+Why support both? Directory mode is the happy path for a single MAG set.
+List-file mode is useful when:
+
+- MAGs live across multiple directories (e.g. separate assemblies per
+  sample) and you don't want to symlink them all into one place.
+- You want to run the pipeline on a curated subset without copying files.
+- A pipeline upstream of MAGDrep emits a manifest of bin paths.
+
 ### Step 1 — genome_stats
 
 Per MAG, one job. Runs `seqkit fx2tab` plus a Python helper to compute

@@ -39,8 +39,9 @@ def main():
 
 @main.command()
 @click.option("--input", "-i", "input_dir", required=True,
-              type=click.Path(exists=True, file_okay=False, path_type=Path),
-              help="Directory of input MAG FASTA files.")
+              type=click.Path(exists=True, path_type=Path),
+              help="Directory of input MAG FASTA files OR a text file with "
+                   "one FASTA path per line (# comments allowed).")
 @click.option("--output", "-o", "output_dir", required=True,
               type=click.Path(path_type=Path),
               help="Output directory.")

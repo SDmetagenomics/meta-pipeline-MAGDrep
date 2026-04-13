@@ -8,7 +8,7 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-9.16-039475?logo=snakemake&logoColor=white)](https://snakemake.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-58%2F58%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-1.0.1-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-1.1.0-brightgreen)]()
 
 </div>
 
@@ -64,6 +64,36 @@ Need more detail? See the [**Program Guide**](docs/program-guide.md) for rationa
 | `dereplicate` | skani 0.3.1 + scipy | Species clustering (UPGMA at 95% ANI) | — |
 
 Each step is batched so memory stays bounded on 10k+ genome datasets. CheckM2 and GTDB-Tk run **concurrently** by default and can be routed to different SLURM partitions.
+
+---
+
+## Specifying input MAGs
+
+Two options for `-i / --input`:
+
+**1. A directory** of FASTAs (`.fna`, `.fa`, `.fasta`, optionally gzipped):
+
+```bash
+meta-pipeline-MAGDrep qc -i /path/to/mags/ -o results/
+```
+
+**2. A text file** with one FASTA path per line — useful when MAGs are scattered across multiple directories or you want to run a curated subset:
+
+```bash
+# mags.txt
+/lab/project_A/bin.001.fna
+/lab/project_B/reassembly/bin.042.fna.gz
+~/favorites/novel_archaeon.fasta
+# lines starting with # are comments; blanks are ignored
+```
+
+```bash
+meta-pipeline-MAGDrep qc -i mags.txt -o results/
+```
+
+Relative paths resolve against the list file's directory. `~` expands to
+`$HOME`. The MAG ID for each genome is the filename stem (minus a
+recognized FASTA suffix); duplicate IDs produce a clear error.
 
 ---
 
@@ -134,7 +164,9 @@ Commands:
 Usage: meta-pipeline-MAGDrep qc [OPTIONS]
 
 Options:
-  -i, --input DIRECTORY           Directory of input MAG FASTA files.  [required]
+  -i, --input PATH                Directory of MAG FASTA files OR a text file
+                                  with one FASTA path per line (# comments
+                                  allowed).  [required]
   -o, --output PATH               Output directory.  [required]
   --profile [gcp|local|slurm]     Execution profile.  [default: local]
   --steps TEXT                    Comma-separated steps to run (e.g. checkm2,gtdbtk). Default: all.
