@@ -4,9 +4,15 @@ from pathlib import Path
 import click
 from meta_pipeline_magdrep import __version__
 from meta_pipeline_magdrep.config import load_and_merge_config, VALID_STEPS, ConfigError
-from meta_pipeline_magdrep.resources import detect_resources, compute_gtdbtk_pplacer_cpus
+from meta_pipeline_magdrep.resources import (
+    detect_resources,
+    compute_gtdbtk_pplacer_cpus,
+    allocate_threads,
+    CHECKM2_CONCURRENT_MEM_GB,
+    SYSTEM_OVERHEAD_GB,
+)
 
-VALID_PROFILES = {"local", "slurm"}
+VALID_PROFILES = {"local", "slurm", "gcp"}
 
 
 @click.group()
@@ -25,7 +31,7 @@ def main():
               help="Output directory.")
 @click.option("--profile", default="local", show_default=True,
               type=click.Choice(list(VALID_PROFILES)),
-              help="Execution profile: local or slurm.")
+              help="Execution profile: local, slurm, or gcp.")
 @click.option("--steps", default=None,
               help="Comma-separated steps to run (e.g. checkm2,gtdbtk). Default: all.")
 @click.option("--skip", default=None,
@@ -69,20 +75,46 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs):
     if cfg["threads_per_job"] == "auto":
         cfg["threads_per_job"] = min(resources.cpu_count, 8)
     if cfg["max_parallel_jobs"] == "auto":
-        cfg["max_parallel_jobs"] = max(1, resources.cpu_count // cfg["threads_per_job"])
+        cfg["max_parallel_jobs"] = max(1, resources.cpu_count)
 
-    # GTDB-Tk: use all cores and auto-scale pplacer_cpus by available memory
+    # Split cores between CheckM2 and GTDB-Tk so they can run concurrently
+    # when both are enabled (they have no DAG dependency on each other).
+    concurrent = len({"checkm2", "gtdbtk"} & set(cfg["steps"]))
+    threads_alloc = allocate_threads(resources.cpu_count, concurrent)
     cfg.setdefault("gtdbtk", {})
-    cfg["gtdbtk"].setdefault("threads", resources.cpu_count)
+
+    if cfg.get("checkm2_threads", "auto") == "auto":
+        cfg["checkm2_threads"] = threads_alloc["checkm2"]
+    if cfg["gtdbtk"].get("threads", "auto") == "auto":
+        cfg["gtdbtk"]["threads"] = threads_alloc["gtdbtk"]
+
+    # pplacer_cpus reserves memory for a concurrent CheckM2 batch when needed
     if cfg["gtdbtk"].get("pplacer_cpus", "auto") == "auto":
+        reserve = SYSTEM_OVERHEAD_GB
+        if concurrent > 1:
+            reserve += CHECKM2_CONCURRENT_MEM_GB
         cfg["gtdbtk"]["pplacer_cpus"] = compute_gtdbtk_pplacer_cpus(
-            resources.mem_gb, max_cpus=resources.cpu_count
+            resources.mem_gb,
+            max_cpus=cfg["gtdbtk"]["threads"],
+            reserve_gb=reserve,
         )
+
     click.echo(
-        f"Detected: {resources.cpu_count} CPUs, {resources.mem_gb:.0f} GB RAM. "
-        f"GTDB-Tk will use --cpus={cfg['gtdbtk']['threads']} "
-        f"--pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+        f"Detected: {resources.cpu_count} CPUs, {resources.mem_gb:.0f} GB RAM."
     )
+    if concurrent > 1:
+        click.echo(
+            f"Running CheckM2 + GTDB-Tk concurrently: "
+            f"CheckM2={cfg['checkm2_threads']} threads, "
+            f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
+            f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+        )
+    else:
+        click.echo(
+            f"CheckM2={cfg['checkm2_threads']} threads, "
+            f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
+            f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+        )
 
     from meta_pipeline_magdrep.runner import run_snakemake
     run_snakemake(

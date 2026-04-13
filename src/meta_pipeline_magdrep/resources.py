@@ -101,14 +101,48 @@ def detect_resources() -> ResourceInfo:
 # Peak RAM usage during phylogenetic placement — scales with tree size.
 GTDBTK_PPLACER_MEM_GB = 60.0
 
+# Approximate memory reserved for CheckM2 when running concurrently with
+# GTDB-Tk. CheckM2's diamond search plus neural-net prediction is ~5-8 GB.
+CHECKM2_CONCURRENT_MEM_GB = 8.0
 
-def compute_gtdbtk_pplacer_cpus(mem_gb: float, max_cpus: int) -> int:
+# OS / buffer / other overhead to reserve when computing memory budgets.
+SYSTEM_OVERHEAD_GB = 8.0
+
+
+def compute_gtdbtk_pplacer_cpus(
+    mem_gb: float, max_cpus: int, reserve_gb: float = 0.0,
+) -> int:
     """Return a safe number of pplacer CPUs based on available memory.
 
     pplacer is memory-bounded: each parallel instance needs ~60 GB for
     the r226 bac120 tree. Exceeding memory causes swapping or OOM kills.
+
+    *reserve_gb* is memory set aside for other work (e.g. a concurrent
+    CheckM2 batch) plus system overhead.
     """
     if mem_gb <= 0:
         return 1
-    by_mem = max(1, int(mem_gb // GTDBTK_PPLACER_MEM_GB))
+    available = max(0.0, mem_gb - reserve_gb)
+    by_mem = max(1, int(available // GTDBTK_PPLACER_MEM_GB))
     return min(by_mem, max_cpus)
+
+
+def allocate_threads(
+    cpu_count: int, concurrent_steps: int,
+) -> dict[str, int]:
+    """Split CPU budget across concurrent pipeline steps.
+
+    When CheckM2 and GTDB-Tk run back-to-back (one active step), each job
+    can claim all CPUs. When they run concurrently (two active steps),
+    split roughly in half so Snakemake schedules them in parallel.
+
+    Returns {"checkm2": N, "gtdbtk": N}.
+    """
+    if concurrent_steps <= 1:
+        return {"checkm2": cpu_count, "gtdbtk": cpu_count}
+    # Leave 1 core for Snakemake orchestration / genome_stats on small systems
+    usable = max(2, cpu_count)
+    half = max(1, usable // 2)
+    # Prefer slightly more CPU for GTDB-Tk (classify_wf parallelizes well)
+    # and slightly less for CheckM2 (saturates at ~8 threads anyway)
+    return {"checkm2": half, "gtdbtk": usable - half}

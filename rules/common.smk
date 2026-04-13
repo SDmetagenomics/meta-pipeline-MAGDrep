@@ -1,6 +1,28 @@
 from pathlib import Path
 
 
+def _coerce_int(val, default):
+    if val is None or val == "None" or val == "" or val == "auto":
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def cfg_int(key, default):
+    """Return config[key] as int, tolerating 'auto'/'None'/strings/missing."""
+    return _coerce_int(config.get(key, default), default)
+
+
+def cfg_nested_int(section, key, default):
+    """Return config[section][key] as int, tolerating missing sections."""
+    sect = config.get(section) or {}
+    if not isinstance(sect, dict):
+        return default
+    return _coerce_int(sect.get(key, default), default)
+
+
 def discover_mag_ids(input_dir):
     """Return sorted list of MAG IDs from FASTA files in input_dir."""
     patterns = ["*.fasta", "*.fa", "*.fna", "*.fasta.gz", "*.fa.gz", "*.fna.gz"]

@@ -5,7 +5,9 @@ include: "rules/common.smk"
 # --- Configuration ---
 INPUT_DIR = Path(config.get("input_dir", "mags"))
 OUTDIR = Path(config.get("outdir", "results"))
-BATCH_SIZE = int(config.get("batch_size", 1000))
+BATCH_SIZE = cfg_int("batch_size", 1000)
+CHECKM2_BATCH_SIZE = cfg_int("checkm2_batch_size", BATCH_SIZE)
+GTDBTK_BATCH_SIZE = cfg_int("gtdbtk_batch_size", BATCH_SIZE)
 STEPS = set(config.get("steps", []))
 
 # Discover MAG IDs from input directory
@@ -13,9 +15,13 @@ MAG_IDS = discover_mag_ids(INPUT_DIR)
 if not MAG_IDS:
     raise ValueError(f"No FASTA files found in input directory: {INPUT_DIR}")
 
-# Compute batch assignments
-BATCHES = make_batches(MAG_IDS, BATCH_SIZE)
-BATCH_IDS = list(BATCHES.keys())  # ["batch_000", "batch_001", ...]
+# Per-tool batch assignments. CheckM2 benefits from smaller batches (more
+# parallelism on cluster/cloud); GTDB-Tk benefits from larger batches
+# (amortizes DB load time).
+CHECKM2_BATCHES = make_batches(MAG_IDS, CHECKM2_BATCH_SIZE)
+CHECKM2_BATCH_IDS = list(CHECKM2_BATCHES.keys())
+GTDBTK_BATCHES = make_batches(MAG_IDS, GTDBTK_BATCH_SIZE)
+GTDBTK_BATCH_IDS = list(GTDBTK_BATCHES.keys())
 
 # Always include genome_stats and aggregate
 include: "rules/genome_stats.smk"

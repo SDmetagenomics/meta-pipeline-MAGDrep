@@ -16,9 +16,20 @@ steps:
 threads_per_job: auto
 max_parallel_jobs: auto
 
-# Batching: number of genomes per batch for batch-mode tools
-# (CheckM2, GTDB-Tk). Keeps memory bounded for 10k+ datasets.
+# Per-tool thread allocation. When both CheckM2 and GTDB-Tk are active,
+# "auto" splits cores between them so they run concurrently (no DAG
+# dependency). Set an integer to override.
+checkm2_threads: auto
+
+# Global batch size for batch-mode tools (CheckM2, GTDB-Tk).
+# Keeps memory bounded for 10k+ datasets.
 batch_size: 1000
+
+# Per-tool batch size overrides (null = use batch_size).
+# - CheckM2 benefits from smaller batches on cluster/cloud (more parallel jobs)
+# - GTDB-Tk benefits from larger batches (amortizes database load)
+checkm2_batch_size: null
+gtdbtk_batch_size: null
 
 # Input FASTA extensions to discover in the input directory
 fasta_extensions:
@@ -47,9 +58,12 @@ db_versions:
   gtdbtk: "r226"
 
 # GTDB-Tk specific options
-# - pplacer_cpus: auto = scale with available memory (~55 GB per pplacer_cpu for r226)
+# - threads: auto = split cores with checkm2 when both active, else all
+# - pplacer_cpus: auto = scale with available memory (~60 GB per pplacer_cpu for r226)
+# - skip_ani_screen: false = run ANI pre-screen (better for near-reference MAGs)
 gtdbtk:
   skip_ani_screen: false
+  threads: auto
   pplacer_cpus: auto
 
 # Quality filter thresholds
