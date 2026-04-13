@@ -97,18 +97,22 @@ def detect_resources() -> ResourceInfo:
     )
 
 
-def detect_slurm_node_resources() -> tuple[int | None, float | None]:
+def detect_slurm_node_resources(
+    partition: str | None = None,
+) -> tuple[int | None, float | None]:
     """Query sinfo for the dominant compute-node CPU/memory spec.
 
+    If *partition* is given, restrict the query to that partition (so
+    heterogeneous clusters can size jobs differently per partition).
     Returns (cpus_per_node, mem_gb_per_node). Either element may be None
-    if detection fails or sinfo is not available. Picks the most common
-    node spec across the default partition — this is a rough heuristic
-    for clusters with heterogeneous partitions.
+    if detection fails or sinfo is not available.
     """
+    cmd = ["sinfo", "-h", "-o", "%c %m"]
+    if partition:
+        cmd.extend(["-p", partition])
     try:
         result = subprocess.run(
-            ["sinfo", "-h", "-o", "%c %m"],
-            capture_output=True, text=True, timeout=10,
+            cmd, capture_output=True, text=True, timeout=10,
         )
         if result.returncode != 0:
             return (None, None)
@@ -139,13 +143,16 @@ def resolve_execution_resources(
     profile: str,
     cfg: dict,
     login_resources: ResourceInfo,
+    partition: str | None = None,
+    cfg_cpus_key: str = "cluster_cpus_per_node",
+    cfg_mem_key: str = "cluster_mem_gb_per_node",
 ) -> tuple[int, float, str]:
     """Return (cpus_per_job, mem_gb_per_job, source_label) for the chosen profile.
 
     For local execution, uses the login-machine resources directly.
-    For cluster/cloud, prefers explicit config (cluster_cpus_per_node,
-    cluster_mem_gb_per_node), then SLURM auto-detection via sinfo,
-    then conservative defaults.
+    For cluster/cloud, prefers explicit config (*cfg_cpus_key* and
+    *cfg_mem_key*), then SLURM auto-detection via sinfo (optionally
+    filtered to *partition*), then conservative defaults.
 
     The source_label describes where the numbers came from (useful for
     the startup message).
@@ -153,18 +160,19 @@ def resolve_execution_resources(
     if profile == "local":
         return (login_resources.cpu_count, login_resources.mem_gb, "local machine")
 
-    cfg_cpus = cfg.get("cluster_cpus_per_node")
-    cfg_mem = cfg.get("cluster_mem_gb_per_node")
+    cfg_cpus = cfg.get(cfg_cpus_key)
+    cfg_mem = cfg.get(cfg_mem_key)
     if cfg_cpus and cfg_mem:
         return (int(cfg_cpus), float(cfg_mem), "config override")
 
     if profile == "slurm":
-        detected_cpus, detected_mem = detect_slurm_node_resources()
+        detected_cpus, detected_mem = detect_slurm_node_resources(partition=partition)
         if detected_cpus and detected_mem:
+            label = f"sinfo (partition={partition})" if partition else "sinfo"
             return (
                 int(cfg_cpus or detected_cpus),
                 float(cfg_mem or detected_mem),
-                "sinfo",
+                label,
             )
 
     # Conservative cluster defaults when nothing else works

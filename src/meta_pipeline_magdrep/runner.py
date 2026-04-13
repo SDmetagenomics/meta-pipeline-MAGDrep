@@ -92,14 +92,36 @@ def _run_snakemake_cli(
         "--profile", str(profile_dir),
     ]
 
+    # Build --config args (skip internal resolution artifacts)
     config_args = []
     for k, v in snk_config.items():
-        if isinstance(v, list):
-            config_args.append(f"{k}={v}")
-        else:
-            config_args.append(f"{k}={v}")
+        if k.startswith("_"):
+            continue
+        config_args.append(f"{k}={v}")
     if config_args:
         cmd.extend(["--config"] + config_args)
+
+    # SLURM partition routing: rules land on the right partition via
+    # --set-resources overrides. Standard rules (checkm2, etc.) go to the
+    # standard partition; gtdbtk_batch goes to the memory partition.
+    partitions = snk_config.get("_resolved_partitions") or {}
+    std_part = partitions.get("standard")
+    mem_part = partitions.get("memory") or std_part
+    if profile == "slurm" and (std_part or mem_part):
+        set_resource_args = []
+        # Default partition for all rules
+        if std_part:
+            set_resource_args.append(f"slurm_partition={std_part}")
+        # gtdbtk_batch override to memory partition (if different)
+        if mem_part and mem_part != std_part:
+            set_resource_args.append(f"gtdbtk_batch:slurm_partition={mem_part}")
+        if set_resource_args:
+            cmd.extend(["--default-resources"] + [
+                a for a in set_resource_args if ":" not in a
+            ])
+            rule_overrides = [a for a in set_resource_args if ":" in a]
+            if rule_overrides:
+                cmd.extend(["--set-resources"] + rule_overrides)
 
     cores_per_node = config.get("slurm_cores_per_node", 64)
     cmd.extend(["--cores", str(cores_per_node)])

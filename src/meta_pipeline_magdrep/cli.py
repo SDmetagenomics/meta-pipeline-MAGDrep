@@ -45,13 +45,25 @@ def main():
 @click.option("--jobs", "-j", default=None, type=int,
               help="Maximum parallel jobs. Overrides config.")
 @click.option("--cluster-cpus", default=None, type=int,
-              help="CPUs per compute node for SLURM/GCP profiles. "
-                   "If not set, SLURM auto-detects via sinfo.")
+              help="CPUs per standard compute node for SLURM/GCP. "
+                   "Auto-detected from sinfo if not set.")
 @click.option("--cluster-mem-gb", default=None, type=int,
-              help="Memory (GB) per compute node for SLURM/GCP profiles. "
-                   "If not set, SLURM auto-detects via sinfo.")
+              help="Memory (GB) per standard compute node. "
+                   "Auto-detected from sinfo if not set.")
+@click.option("--cluster-mem-node-cpus", default=None, type=int,
+              help="CPUs on memory partition nodes (for GTDB-Tk). "
+                   "Defaults to --cluster-cpus if not set.")
+@click.option("--cluster-mem-node-mem-gb", default=None, type=int,
+              help="Memory (GB) on memory partition nodes (for GTDB-Tk). "
+                   "Defaults to --cluster-mem-gb if not set.")
+@click.option("--slurm-standard-partition", default="normal", show_default=True,
+              help="SLURM partition for CheckM2 and most rules.")
+@click.option("--slurm-memory-partition", default=None,
+              help="SLURM partition for GTDB-Tk (high-memory). "
+                   "Defaults to --slurm-standard-partition if not set.")
 def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
-       cluster_cpus, cluster_mem_gb):
+       cluster_cpus, cluster_mem_gb, cluster_mem_node_cpus, cluster_mem_node_mem_gb,
+       slurm_standard_partition, slurm_memory_partition):
     """Run quality assessment on a directory of MAG FASTA files."""
     overrides = {"outdir": str(output_dir)}
     if jobs:
@@ -60,6 +72,12 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
         overrides["cluster_cpus_per_node"] = cluster_cpus
     if cluster_mem_gb:
         overrides["cluster_mem_gb_per_node"] = cluster_mem_gb
+    if cluster_mem_node_cpus:
+        overrides["cluster_mem_node_cpus"] = cluster_mem_node_cpus
+    if cluster_mem_node_mem_gb:
+        overrides["cluster_mem_node_mem_gb"] = cluster_mem_node_mem_gb
+    overrides["slurm_standard_partition"] = slurm_standard_partition
+    overrides["slurm_memory_partition"] = slurm_memory_partition or slurm_standard_partition
 
     try:
         cfg = load_and_merge_config(config_file, overrides)
@@ -86,60 +104,90 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
     # and for selecting sensible defaults).
     login_resources = detect_resources()
 
-    # Pick per-job resources based on the execution profile. For SLURM/GCP
-    # we size jobs to a single compute node, not the login node.
-    job_cpus, job_mem_gb, source = resolve_execution_resources(
+    # Standard-partition sizing: CheckM2 and most other rules run here.
+    std_cpus, std_mem_gb, std_source = resolve_execution_resources(
         profile, cfg, login_resources,
+        partition=cfg.get("slurm_standard_partition") if profile == "slurm" else None,
     )
 
-    if cfg["threads_per_job"] == "auto":
-        cfg["threads_per_job"] = min(job_cpus, 8)
-    if cfg["max_parallel_jobs"] == "auto":
-        cfg["max_parallel_jobs"] = max(1, job_cpus) if profile == "local" else 500
-
-    # Split cores between CheckM2 and GTDB-Tk so they can run concurrently
-    # when both are enabled (they have no DAG dependency on each other).
-    concurrent = len({"checkm2", "gtdbtk"} & set(cfg["steps"]))
-    threads_alloc = allocate_threads(job_cpus, concurrent)
-    cfg.setdefault("gtdbtk", {})
-
-    if cfg.get("checkm2_threads", "auto") == "auto":
-        cfg["checkm2_threads"] = threads_alloc["checkm2"]
-    if cfg["gtdbtk"].get("threads", "auto") == "auto":
-        cfg["gtdbtk"]["threads"] = threads_alloc["gtdbtk"]
-
-    # pplacer_cpus reserves memory for a concurrent CheckM2 batch when needed
-    if cfg["gtdbtk"].get("pplacer_cpus", "auto") == "auto":
-        reserve = SYSTEM_OVERHEAD_GB
-        if concurrent > 1:
-            reserve += CHECKM2_CONCURRENT_MEM_GB
-        cfg["gtdbtk"]["pplacer_cpus"] = compute_gtdbtk_pplacer_cpus(
-            job_mem_gb,
-            max_cpus=cfg["gtdbtk"]["threads"],
-            reserve_gb=reserve,
-        )
-
-    click.echo(
-        f"Sizing jobs for {job_cpus} CPUs, {job_mem_gb:.0f} GB RAM (source: {source})."
+    # Memory-partition sizing: GTDB-Tk runs here on heterogeneous clusters.
+    # Falls back to standard-partition sizing when no distinct memory
+    # partition is configured.
+    mem_partition = cfg.get("slurm_memory_partition")
+    std_partition = cfg.get("slurm_standard_partition")
+    distinct_memory = (
+        profile == "slurm" and mem_partition and mem_partition != std_partition
     )
-    if profile != "local":
-        click.echo(
-            f"Profile={profile}: each rule will be submitted as a separate job. "
-            f"SLURM/GCP will place jobs across nodes based on available resources."
-        )
-    if concurrent > 1:
-        click.echo(
-            f"CheckM2 + GTDB-Tk run concurrently (per batch or per node): "
-            f"CheckM2={cfg['checkm2_threads']} threads, "
-            f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
-            f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+    if distinct_memory:
+        mem_cpus, mem_mem_gb, mem_source = resolve_execution_resources(
+            profile, cfg, login_resources,
+            partition=mem_partition,
+            cfg_cpus_key="cluster_mem_node_cpus",
+            cfg_mem_key="cluster_mem_node_mem_gb",
         )
     else:
-        click.echo(
-            f"CheckM2={cfg['checkm2_threads']} threads, "
-            f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
-            f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+        mem_cpus, mem_mem_gb, mem_source = std_cpus, std_mem_gb, std_source
+
+    if cfg["threads_per_job"] == "auto":
+        cfg["threads_per_job"] = min(std_cpus, 8)
+    if cfg["max_parallel_jobs"] == "auto":
+        cfg["max_parallel_jobs"] = max(1, std_cpus) if profile == "local" else 500
+
+    cfg.setdefault("gtdbtk", {})
+
+    # When rules run on the same partition (same node pool), they contend
+    # for CPUs, so split allocations. When on different partitions, each
+    # rule gets its full partition's CPU budget.
+    concurrent = len({"checkm2", "gtdbtk"} & set(cfg["steps"]))
+    if concurrent > 1 and not distinct_memory:
+        threads_alloc = allocate_threads(std_cpus, concurrent)
+        checkm2_threads = threads_alloc["checkm2"]
+        gtdbtk_threads = threads_alloc["gtdbtk"]
+        # Reserve memory for a concurrent CheckM2 batch on same node
+        pplacer_reserve = SYSTEM_OVERHEAD_GB + CHECKM2_CONCURRENT_MEM_GB
+    else:
+        checkm2_threads = std_cpus
+        gtdbtk_threads = mem_cpus
+        pplacer_reserve = SYSTEM_OVERHEAD_GB
+
+    if cfg.get("checkm2_threads", "auto") == "auto":
+        cfg["checkm2_threads"] = checkm2_threads
+    if cfg["gtdbtk"].get("threads", "auto") == "auto":
+        cfg["gtdbtk"]["threads"] = gtdbtk_threads
+    if cfg["gtdbtk"].get("pplacer_cpus", "auto") == "auto":
+        cfg["gtdbtk"]["pplacer_cpus"] = compute_gtdbtk_pplacer_cpus(
+            mem_mem_gb,
+            max_cpus=cfg["gtdbtk"]["threads"],
+            reserve_gb=pplacer_reserve,
         )
+
+    # Stash resolved partitions into config so the runner/profile can pick
+    # them up for per-rule --set-resources overrides.
+    cfg["_resolved_partitions"] = {
+        "standard": std_partition,
+        "memory": mem_partition,
+    }
+
+    # Startup banner
+    if profile == "local":
+        click.echo(f"Sizing jobs for {std_cpus} CPUs, {std_mem_gb:.0f} GB RAM (source: {std_source}).")
+    elif distinct_memory:
+        click.echo(
+            f"Standard nodes ({std_partition}): {std_cpus} CPUs, {std_mem_gb:.0f} GB "
+            f"(source: {std_source}).\n"
+            f"Memory nodes ({mem_partition}): {mem_cpus} CPUs, {mem_mem_gb:.0f} GB "
+            f"(source: {mem_source}).\n"
+            f"CheckM2 routes to {std_partition}; GTDB-Tk routes to {mem_partition}."
+        )
+    else:
+        click.echo(f"Sizing jobs for {std_cpus} CPUs, {std_mem_gb:.0f} GB RAM (source: {std_source}).")
+        click.echo(f"Profile={profile}: SLURM/GCP handles node placement.")
+
+    click.echo(
+        f"CheckM2={cfg['checkm2_threads']} threads, "
+        f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
+        f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
+    )
 
     from meta_pipeline_magdrep.runner import run_snakemake
     run_snakemake(
