@@ -5,11 +5,10 @@
 outdir: results
 
 # Steps to run (all enabled by default)
-# Valid values: genome_stats, checkm2, gunc, gtdbtk, dereplicate
+# Valid values: genome_stats, checkm2, gtdbtk, dereplicate
 steps:
   - genome_stats
   - checkm2
-  - gunc
   - gtdbtk
   - dereplicate
 
@@ -18,7 +17,7 @@ threads_per_job: auto
 max_parallel_jobs: auto
 
 # Batching: number of genomes per batch for batch-mode tools
-# (CheckM2, GUNC, GTDB-Tk). Keeps memory bounded for 10k+ datasets.
+# (CheckM2, GTDB-Tk). Keeps memory bounded for 10k+ datasets.
 batch_size: 1000
 
 # Input FASTA extensions to discover in the input directory
@@ -35,23 +34,23 @@ db_dir: databases
 
 # Optional: paths to pre-existing databases (null = expect in db_dir)
 checkm2_db_path: null
-gunc_db_path: null
 gtdbtk_db_path: null
 
-# Pinned database versions
+# Pinned tool and database versions
+tool_versions:
+  checkm2: "1.1.0"
+  gtdbtk: "2.5.2"
+  skani: "0.3.1"
+  seqkit: "2.13.0"
 db_versions:
-  checkm2: "1.0.2"
-  gunc: "gtdb_214"
+  checkm2: "2.0.0"       # CheckM2 diamond DB bundled with checkm2 1.1.0
   gtdbtk: "r226"
 
 # GTDB-Tk specific options
+# - pplacer_cpus: auto = scale with available memory (~55 GB per pplacer_cpu for r226)
 gtdbtk:
   skip_ani_screen: false
-  pplacer_cpus: 1
-
-# GUNC specific options
-gunc:
-  db_type: "gtdb_214"
+  pplacer_cpus: auto
 
 # Quality filter thresholds
 quality_filter:
@@ -60,10 +59,11 @@ quality_filter:
   medium_completeness: 60.0
   medium_contamination: 10.0
   min_quality_score: 50.0
-  gunc_css_threshold: 0.45
   default_filter: medium_quality
 
 # Dereplication settings (skani-based species clustering)
+# Connected components are detected at 90% ANI, then average-linkage
+# clustering is performed independently within each component.
 dereplicate:
   ani_threshold: 95.0
   min_af: 10.0
@@ -72,4 +72,3 @@ dereplicate:
     w_completeness: 1.0
     w_n50: 0.5
     w_contam: 0.5
-    w_gunc: 0.5

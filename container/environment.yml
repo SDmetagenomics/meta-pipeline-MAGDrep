@@ -14,14 +14,15 @@ dependencies:
   - seqkit=2.8
   # Genome quality
   - checkm2=1.0.2
-  # Chimerism detection (GUNC requires diamond and prodigal)
+  # CheckM2 and GTDB-Tk both use diamond + prodigal
   - diamond=2.1
   - prodigal=2.6
   # Taxonomy
   - gtdbtk=2.5
   # Dereplication
   - skani=0.2
+  - scipy
   # Utilities
   - parallel=20231022
   - pip:
-    - gunc>=1.1.0
+    - -e .
