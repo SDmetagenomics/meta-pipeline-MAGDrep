@@ -40,6 +40,11 @@ def test_run_checkm2_calls_correct_command(mock_run, tmp_path):
 
     mock_run.assert_called_once()
     cmd = mock_run.call_args[0][0]
-    assert "checkm2" in cmd[0]
-    assert "predict" in cmd
-    assert "--threads" in cmd
+    # We invoke checkm2 via a python wrapper to force fork multiprocessing;
+    # verify the wrapper includes the expected checkm2 arguments.
+    assert cmd[0] == "python"
+    assert cmd[1] == "-c"
+    wrapper = cmd[2]
+    assert "checkm2" in wrapper
+    assert "predict" in wrapper
+    assert "--threads" in wrapper
