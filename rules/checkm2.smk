@@ -3,7 +3,7 @@ rule checkm2_setup_batch:
     input:
         fastas=lambda wc: [mag_fasta(INPUT_DIR, mid) for mid in CHECKM2_BATCHES[wc.batch_id]]
     output:
-        batch_dir=directory(str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "input"))
+        batch_dir=directory(str(OUTDIR / "checkm2" / "batches" / "{batch_id}" / "input"))
     threads: 1
     run:
         create_batch_dir(wildcards.batch_id, CHECKM2_BATCHES[wildcards.batch_id],
@@ -11,16 +11,20 @@ rule checkm2_setup_batch:
 
 
 rule checkm2_batch:
-    """Run CheckM2 predict on one batch."""
+    """Run CheckM2 predict on one batch.
+
+    Raw tool output (protein_files/, diamond_output/, quality_report.tsv)
+    lands in results/checkm2/batches/{batch_id}/raw/ for downstream inspection.
+    """
     input:
-        batch_dir=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "input")
+        batch_dir=str(OUTDIR / "checkm2" / "batches" / "{batch_id}" / "input")
     output:
-        results=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "quality_report.tsv")
+        results=str(OUTDIR / "checkm2" / "batches" / "{batch_id}" / "quality_report.tsv")
     benchmark:
         str(OUTDIR / "benchmarks" / "checkm2" / "{batch_id}.tsv")
     threads: cfg_int("checkm2_threads", 8)
     params:
-        outdir=str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "output"),
+        outdir=str(OUTDIR / "checkm2" / "batches" / "{batch_id}" / "raw"),
         db_path=config.get("checkm2_db_path", ""),
     shell:
         "python scripts/run_checkm2.py {input.batch_dir} {params.outdir} {output.results} {threads} {params.db_path}"
@@ -29,10 +33,10 @@ rule checkm2_batch:
 rule checkm2_merge:
     """Concatenate all batch quality reports into one file."""
     input:
-        expand(str(OUTDIR / "batches" / "checkm2" / "{batch_id}" / "quality_report.tsv"),
+        expand(str(OUTDIR / "checkm2" / "batches" / "{batch_id}" / "quality_report.tsv"),
                batch_id=CHECKM2_BATCH_IDS)
     output:
-        str(OUTDIR / "checkm2_quality.tsv")
+        str(OUTDIR / "checkm2" / "checkm2_quality.tsv")
     threads: 1
     run:
         header = None

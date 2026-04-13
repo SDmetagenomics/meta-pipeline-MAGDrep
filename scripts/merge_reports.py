@@ -73,6 +73,7 @@ def merge_all_reports(
     output_combined: str,
     output_filtered: str,
     quality_cfg: dict,
+    output_summary: str | None = None,
 ) -> None:
     """
     Left-join all reports on mag_id, compute quality tiers,
@@ -134,6 +135,21 @@ def merge_all_reports(
     filtered_rows = [r for r in rows_sorted if r.get("quality_tier") in passing_tiers]
     _write_tsv(filtered_rows, output_cols, output_filtered)
 
+    # 8. Write focused summary report: one row per genome with the most
+    # commonly-needed fields (genome stats + quality + taxonomy).
+    if output_summary:
+        summary_cols = [
+            "mag_id",
+            "total_length_bp", "gc_percent", "contig_count", "n50_bp",
+            "largest_contig_bp",
+            "completeness", "contamination", "quality_score", "quality_tier",
+            "domain", "phylum", "class", "order", "family", "genus", "species",
+            "classification",
+        ]
+        summary_cols = [c for c in summary_cols if c in available_cols
+                        or c in ("quality_score", "quality_tier")]
+        _write_tsv(rows_sorted, summary_cols, output_summary)
+
 
 def _write_tsv(rows: list[dict], columns: list[str], output_path: str) -> None:
     """Write rows to a TSV with specified column order."""
@@ -165,6 +181,7 @@ if __name__ == "__main__":
     parser.add_argument("--gtdbtk", default=None)
     parser.add_argument("--output-combined", required=True)
     parser.add_argument("--output-filtered", required=True)
+    parser.add_argument("--output-summary", default=None)
     parser.add_argument("--quality-config", default=None,
                         help="JSON string or path to YAML config file")
     args = parser.parse_args()
@@ -183,5 +200,6 @@ if __name__ == "__main__":
         gtdbtk_path=args.gtdbtk if args.gtdbtk else None,
         output_combined=args.output_combined,
         output_filtered=args.output_filtered,
+        output_summary=args.output_summary,
         quality_cfg=quality_cfg,
     )

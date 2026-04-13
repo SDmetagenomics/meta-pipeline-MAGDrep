@@ -27,8 +27,8 @@ rule dereplicate_cluster:
         edge_list=str(OUTDIR / "dereplicate" / "skani_edges.tsv"),
         filtered_report=str(OUTDIR / "filtered_report.tsv"),
     output:
-        clusters=str(OUTDIR / "species_clusters.tsv"),
-        derep_report=str(OUTDIR / "dereplicated_report.tsv"),
+        clusters=str(OUTDIR / "dereplicate" / "species_clusters.tsv"),
+        derep_report=str(OUTDIR / "dereplicate" / "dereplicated_report.tsv"),
     benchmark:
         str(OUTDIR / "benchmarks" / "dereplicate_cluster.tsv")
     threads: 1

@@ -39,11 +39,14 @@ if "dereplicate" in STEPS:
 
 def all_outputs():
     """Build the list of expected final outputs based on selected steps."""
-    outputs = [str(OUTDIR / "combined_report.tsv")]
-    outputs.append(str(OUTDIR / "filtered_report.tsv"))
+    outputs = [
+        str(OUTDIR / "combined_report.tsv"),
+        str(OUTDIR / "filtered_report.tsv"),
+        str(OUTDIR / "summary_report.tsv"),
+    ]
     if "dereplicate" in STEPS:
-        outputs.append(str(OUTDIR / "dereplicated_report.tsv"))
-        outputs.append(str(OUTDIR / "species_clusters.tsv"))
+        outputs.append(str(OUTDIR / "dereplicate" / "dereplicated_report.tsv"))
+        outputs.append(str(OUTDIR / "dereplicate" / "species_clusters.tsv"))
     return outputs
 
 

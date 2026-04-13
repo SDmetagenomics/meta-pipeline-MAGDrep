@@ -7,7 +7,7 @@ rule gtdbtk_setup_batch:
     input:
         fastas=lambda wc: [mag_fasta(INPUT_DIR, mid) for mid in GTDBTK_BATCHES[wc.batch_id]]
     output:
-        batch_dir=directory(str(OUTDIR / "batches" / "gtdbtk" / "{batch_id}" / "input"))
+        batch_dir=directory(str(OUTDIR / "gtdbtk" / "batches" / "{batch_id}" / "input"))
     threads: 1
     run:
         import os
@@ -21,18 +21,22 @@ rule gtdbtk_setup_batch:
 
 
 rule gtdbtk_batch:
-    """Run GTDB-Tk classify_wf on one batch."""
+    """Run GTDB-Tk classify_wf on one batch.
+
+    Full raw output (align/, classify/, identify/, etc.) lands at
+    results/gtdbtk/batches/{batch_id}/raw/ for downstream inspection.
+    """
     input:
-        batch_dir=str(OUTDIR / "batches" / "gtdbtk" / "{batch_id}" / "input")
+        batch_dir=str(OUTDIR / "gtdbtk" / "batches" / "{batch_id}" / "input")
     output:
-        results=str(OUTDIR / "batches" / "gtdbtk" / "{batch_id}" / "gtdbtk_output.tsv")
+        results=str(OUTDIR / "gtdbtk" / "batches" / "{batch_id}" / "gtdbtk_output.tsv")
     benchmark:
         str(OUTDIR / "benchmarks" / "gtdbtk" / "{batch_id}.tsv")
     threads: cfg_nested_int("gtdbtk", "threads", 16)
     resources:
         mem_mb=120000
     params:
-        outdir=str(OUTDIR / "batches" / "gtdbtk" / "{batch_id}" / "output"),
+        outdir=str(OUTDIR / "gtdbtk" / "batches" / "{batch_id}" / "raw"),
         pplacer_cpus=cfg_nested_int("gtdbtk", "pplacer_cpus", 1),
         skip_ani=config.get("gtdbtk", {}).get("skip_ani_screen", False),
         db_path=config.get("gtdbtk_db_path", ""),
@@ -44,10 +48,10 @@ rule gtdbtk_batch:
 rule gtdbtk_merge:
     """Concatenate all batch GTDB-Tk reports into one file."""
     input:
-        expand(str(OUTDIR / "batches" / "gtdbtk" / "{batch_id}" / "gtdbtk_output.tsv"),
+        expand(str(OUTDIR / "gtdbtk" / "batches" / "{batch_id}" / "gtdbtk_output.tsv"),
                batch_id=GTDBTK_BATCH_IDS)
     output:
-        str(OUTDIR / "gtdbtk_taxonomy.tsv")
+        str(OUTDIR / "gtdbtk" / "gtdbtk_taxonomy.tsv")
     threads: 1
     run:
         header = None
