@@ -115,9 +115,15 @@ def run_gtdbtk(
             cmd.extend(["--extension", ext.lstrip(".")])
             break
 
+    # Use node-local scratch if TMPDIR points to fast local storage
+    # (e.g. SLURM's /tmp/$JOB_ID). Falls back to GTDB-Tk default otherwise.
+    import os
+    tmpdir = os.environ.get("TMPDIR")
+    if tmpdir and Path(tmpdir).exists():
+        cmd.extend(["--scratch_dir", tmpdir])
+
     env = None
     if db_path:
-        import os
         env = {**os.environ, "GTDBTK_DATA_PATH": db_path}
 
     subprocess.run(cmd, check=True, env=env)

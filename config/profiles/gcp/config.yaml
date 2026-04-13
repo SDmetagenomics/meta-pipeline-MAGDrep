@@ -1,0 +1,98 @@
+# Google Cloud (Batch) profile for meta-pipeline-MAGDrep
+#
+# Requires:
+#   - snakemake-executor-plugin-googlebatch (install: pip install snakemake-executor-plugin-googlebatch)
+#   - A GCP project with the Batch API enabled
+#   - A container image or VM template with the magdrep conda env
+#   - Databases on a persistent disk, GCS bucket (via gcsfuse), or baked into image
+#
+# Before first use:
+#   gcloud auth application-default login
+#   gcloud config set project YOUR_PROJECT_ID
+#
+# Environment variables consumed by this profile:
+#   GOOGLE_BATCH_PROJECT  — GCP project ID (required)
+#   GOOGLE_BATCH_REGION   — e.g. us-central1 (required)
+#   GOOGLE_BATCH_BUCKET   — GCS bucket for remote storage (required)
+#   MAGDREP_CONTAINER     — container image URI, e.g. gcr.io/PROJECT/magdrep:latest
+#
+# Usage:
+#   export GOOGLE_BATCH_PROJECT=my-project
+#   export GOOGLE_BATCH_REGION=us-central1
+#   export GOOGLE_BATCH_BUCKET=my-magdrep-bucket
+#   meta-pipeline-MAGDrep qc -i gs://bucket/mags -o gs://bucket/results --profile gcp
+#
+# See docs/deployment/gcp.md for full setup instructions.
+
+executor: googlebatch
+jobs: 200                 # concurrent Batch jobs; increase up to your quota
+
+# Google Batch executor settings
+googlebatch-project: $GOOGLE_BATCH_PROJECT
+googlebatch-region: $GOOGLE_BATCH_REGION
+googlebatch-image-family: batch-debian
+googlebatch-boot-disk-gb: 50
+
+# Remote storage for inputs/outputs — all intermediates live on GCS.
+# Requires the fastapi/googlecloudstorage storage plugin.
+default-storage-provider: gcs
+storage-gcs-project: $GOOGLE_BATCH_PROJECT
+
+# Default job resources — overridden per rule below.
+default-resources:
+  googlebatch_machine_type: n2-standard-8
+  googlebatch_cpu_milli: 4000
+  googlebatch_memory: 16000
+  googlebatch_image_uri: $MAGDREP_CONTAINER
+  runtime: 60
+
+# Per-rule machine types chosen to match the tool's resource profile.
+# See https://cloud.google.com/compute/docs/machine-types
+set-resources:
+  genome_stats:
+    googlebatch_machine_type: e2-small
+    googlebatch_cpu_milli: 1000
+    googlebatch_memory: 2000
+    runtime: 10
+
+  # CheckM2: diamond + neural net. n2-standard-16 fits 8 threads comfortably.
+  # Use preemptible VMs for 60-80% cost savings — jobs will auto-retry on preemption.
+  checkm2_batch:
+    googlebatch_machine_type: n2-standard-16
+    googlebatch_cpu_milli: 16000
+    googlebatch_memory: 32000
+    googlebatch_preemptible: true
+    runtime: 180
+
+  # GTDB-Tk: pplacer dominates and needs memory (~60 GB per pplacer_cpu for r226).
+  # n2-highmem-32 has 256 GB → 4 pplacer CPUs. Don't preempt — restarts are expensive.
+  gtdbtk_batch:
+    googlebatch_machine_type: n2-highmem-32
+    googlebatch_cpu_milli: 32000
+    googlebatch_memory: 256000
+    googlebatch_preemptible: false
+    runtime: 720
+
+  # skani triangle benefits from many cores on a single node.
+  skani_triangle:
+    googlebatch_machine_type: n2-standard-32
+    googlebatch_cpu_milli: 32000
+    googlebatch_memory: 64000
+    runtime: 120
+
+  # Small, fast rules — cheap machines.
+  genome_stats_merge:
+    googlebatch_machine_type: e2-small
+    runtime: 5
+  merge_reports:
+    googlebatch_machine_type: e2-small
+    runtime: 15
+  dereplicate_cluster:
+    googlebatch_machine_type: e2-medium
+    googlebatch_memory: 16000
+    runtime: 30
+
+keep-going: true
+rerun-incomplete: true
+printshellcmds: true
+latency-wait: 60
