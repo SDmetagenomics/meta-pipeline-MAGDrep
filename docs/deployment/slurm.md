@@ -34,13 +34,36 @@ meta-pipeline-MAGDrep qc \
   `$TMPDIR` and passes it as `--scratch_dir`.
 - **Up to 500 concurrent jobs** (`jobs: 500`) — raise to your partition's cap.
 
+## Heterogeneous clusters (standard + memory partitions)
+
+Many clusters reserve high-memory nodes on a separate partition. MAGDrep
+routes GTDB-Tk to the memory partition and sizes it to those larger nodes:
+
+```bash
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
+    --slurm-standard-partition standard \
+    --slurm-memory-partition memory \
+    --cluster-cpus 64 --cluster-mem-gb 256 \
+    --cluster-mem-node-cpus 96 --cluster-mem-node-mem-gb 1024
+```
+
+Result:
+- `checkm2_batch`, `skani_triangle`, `genome_stats`, etc. → `standard` partition,
+  each job sized to standard node (64 CPU / 256 GB).
+- `gtdbtk_batch` → `memory` partition, each job sized to memory node
+  (96 CPU / 1 TB, supporting ~16 pplacer CPUs).
+
+If the `--cluster-mem-node-*` flags are omitted they fall back to the standard
+values. If `--slurm-memory-partition` is omitted, everything runs on the
+standard partition (original single-partition behavior).
+
 ## Cluster-aware auto-detection
 
 The CLI does NOT use login-node resources when `--profile slurm` is set.
 Instead it determines per-job sizing from (in order):
 
 1. `--cluster-cpus N --cluster-mem-gb M` command-line flags
-2. `sinfo` (parses the dominant node spec on your default partition)
+2. `sinfo -p <partition>` (parses the dominant node spec for each partition)
 3. Conservative fallback: 32 CPUs, 256 GB per job
 
 Example:
