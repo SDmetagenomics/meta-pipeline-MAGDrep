@@ -34,24 +34,34 @@ meta-pipeline-MAGDrep qc \
   `$TMPDIR` and passes it as `--scratch_dir`.
 - **Up to 500 concurrent jobs** (`jobs: 500`) — raise to your partition's cap.
 
-## Tuning for your cluster
+## Cluster-aware auto-detection
 
-Edit `config/profiles/slurm/config.yaml` to match your node sizing. Key
-numbers:
+The CLI does NOT use login-node resources when `--profile slurm` is set.
+Instead it determines per-job sizing from (in order):
 
-| Node size | Recommended `gtdbtk_batch` resources | pplacer_cpus |
-|---|---|---|
-| 128 GB, 16 CPU | mem=100000, cpus=16 | 1 |
-| 256 GB, 32 CPU | mem=240000, cpus=32 | 3 |
-| 512 GB, 64 CPU | mem=480000, cpus=64 | 6 |
-| 1 TB, 96 CPU | mem=960000, cpus=96 | 12 |
+1. `--cluster-cpus N --cluster-mem-gb M` command-line flags
+2. `sinfo` (parses the dominant node spec on your default partition)
+3. Conservative fallback: 32 CPUs, 256 GB per job
 
-The auto-resolution in the CLI picks `pplacer_cpus` from *login node*
-memory, which may be wrong on HPC. Override explicitly:
+Example:
 
 ```bash
-meta-pipeline-MAGDrep qc ... --config gtdbtk.pplacer_cpus=6
+meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
+    --cluster-cpus 64 --cluster-mem-gb 512 \
+    --config checkm2_batch_size=200 gtdbtk_batch_size=1000
 ```
+
+At startup the CLI prints which source it used:
+`Sizing jobs for 64 CPUs, 512 GB RAM (source: sinfo).`
+
+Key numbers for common node sizes:
+
+| Node size | Auto-computed CheckM2 / GTDB-Tk threads | pplacer_cpus |
+|---|---|---|
+| 128 GB, 16 CPU | 8 / 8 | 1 |
+| 256 GB, 32 CPU | 16 / 16 | 3 |
+| 512 GB, 64 CPU | 32 / 32 | 8 |
+| 1 TB, 96 CPU | 48 / 48 | 16 |
 
 ## Database placement
 

@@ -97,6 +97,80 @@ def detect_resources() -> ResourceInfo:
     )
 
 
+def detect_slurm_node_resources() -> tuple[int | None, float | None]:
+    """Query sinfo for the dominant compute-node CPU/memory spec.
+
+    Returns (cpus_per_node, mem_gb_per_node). Either element may be None
+    if detection fails or sinfo is not available. Picks the most common
+    node spec across the default partition — this is a rough heuristic
+    for clusters with heterogeneous partitions.
+    """
+    try:
+        result = subprocess.run(
+            ["sinfo", "-h", "-o", "%c %m"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return (None, None)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return (None, None)
+
+    # Tally node specs; each line is "<cpus> <mem_mb>"
+    counts: dict[tuple[int, int], int] = {}
+    for line in result.stdout.strip().splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        try:
+            cpus = int(parts[0])
+            mem_mb = int(parts[1].rstrip("+"))
+        except ValueError:
+            continue
+        counts[(cpus, mem_mb)] = counts.get((cpus, mem_mb), 0) + 1
+
+    if not counts:
+        return (None, None)
+
+    (cpus, mem_mb), _ = max(counts.items(), key=lambda kv: kv[1])
+    return (cpus, mem_mb / 1024.0)
+
+
+def resolve_execution_resources(
+    profile: str,
+    cfg: dict,
+    login_resources: ResourceInfo,
+) -> tuple[int, float, str]:
+    """Return (cpus_per_job, mem_gb_per_job, source_label) for the chosen profile.
+
+    For local execution, uses the login-machine resources directly.
+    For cluster/cloud, prefers explicit config (cluster_cpus_per_node,
+    cluster_mem_gb_per_node), then SLURM auto-detection via sinfo,
+    then conservative defaults.
+
+    The source_label describes where the numbers came from (useful for
+    the startup message).
+    """
+    if profile == "local":
+        return (login_resources.cpu_count, login_resources.mem_gb, "local machine")
+
+    cfg_cpus = cfg.get("cluster_cpus_per_node")
+    cfg_mem = cfg.get("cluster_mem_gb_per_node")
+    if cfg_cpus and cfg_mem:
+        return (int(cfg_cpus), float(cfg_mem), "config override")
+
+    if profile == "slurm":
+        detected_cpus, detected_mem = detect_slurm_node_resources()
+        if detected_cpus and detected_mem:
+            return (
+                int(cfg_cpus or detected_cpus),
+                float(cfg_mem or detected_mem),
+                "sinfo",
+            )
+
+    # Conservative cluster defaults when nothing else works
+    return (int(cfg_cpus or 32), float(cfg_mem or 256), "cluster defaults")
+
+
 # Memory budget for one GTDB-Tk pplacer process on r226 bac120 (GB).
 # Peak RAM usage during phylogenetic placement — scales with tree size.
 GTDBTK_PPLACER_MEM_GB = 60.0

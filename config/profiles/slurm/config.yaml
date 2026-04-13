@@ -1,17 +1,22 @@
 # SLURM profile for meta-pipeline-MAGDrep
 #
-# Designed for nodes with 64 cores and 512 GB RAM.
-# Defaults assume: CheckM2 batches of 200 (many fast jobs), GTDB-Tk batches
-# of 1000 (amortize DB load). Set checkm2_batch_size / gtdbtk_batch_size
-# in your run config to tune.
+# Resource sizing (threads, pplacer_cpus) comes from the CLI auto-detection
+# of your SLURM nodes — it runs `sinfo` to find the dominant node size, or
+# honors these config overrides if set:
+#   --config cluster_cpus_per_node=64 cluster_mem_gb_per_node=512
+#
+# The `threads` declared on each rule becomes --cpus-per-task in sbatch,
+# so we do NOT set cpus_per_task here; it would override the rule's
+# computed value. Memory and runtime are still profile-controlled.
 #
 # Usage:
 #   meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
 #     --config checkm2_batch_size=200 gtdbtk_batch_size=1000
 #
 # Tips:
+#   - Set $TMPDIR to node-local SSD for faster GTDB-Tk scratch
+#     (run_gtdbtk.py detects TMPDIR and passes --scratch_dir automatically)
 #   - Override --jobs if your cluster allows more concurrent jobs.
-#   - Set $TMPDIR on each node to node-local SSD for faster GTDB-Tk scratch.
 
 executor: slurm
 jobs: 500                 # raise to match your partition's concurrent-job cap
@@ -20,7 +25,6 @@ rerun-incomplete: true
 printshellcmds: true
 latency-wait: 60
 
-# Default resources for any unlisted rule
 default-resources:
   slurm_partition: "normal"
   mem_mb: 16000
@@ -29,57 +33,50 @@ default-resources:
   tasks: 1
   tmpdir: "/tmp/$SLURM_JOB_ID"   # node-local scratch for intermediates
 
-# Per-rule resource requests. cpus_per_task is the critical knob — match
-# the tool's `threads` value so SLURM allocates accordingly.
+# Per-rule memory and runtime. We intentionally do NOT set cpus_per_task
+# here — the rule's `threads:` value (computed by the CLI from your
+# cluster node size) drives --cpus-per-task.
 set-resources:
   genome_stats:
     runtime: 5
     mem_mb: 4000
-    cpus_per_task: 1
 
-  # CheckM2: ~2.5 GB per genome + ~5 GB diamond DB. Tune mem to your batch size.
   checkm2_setup_batch:
     runtime: 10
     mem_mb: 2000
-    cpus_per_task: 1
   checkm2_batch:
-    runtime: 180           # plenty for 200 genomes with 8+ threads
+    runtime: 180           # 200 MAGs at 8+ threads
     mem_mb: 16000
-    cpus_per_task: 16
   checkm2_merge:
     runtime: 10
     mem_mb: 4000
-    cpus_per_task: 1
 
-  # GTDB-Tk: pplacer dominates. ~60 GB per pplacer_cpu for r226 bac120.
-  # With 512 GB per node you can run pplacer_cpus=6 comfortably.
   gtdbtk_setup_batch:
     runtime: 10
     mem_mb: 2000
-    cpus_per_task: 1
   gtdbtk_batch:
-    runtime: 720           # classify_wf on 1000 genomes can take ~4-8h
-    mem_mb: 400000         # 400 GB: fits 6 pplacer processes + buffer
-    cpus_per_task: 32
+    runtime: 720           # classify_wf on 1000 genomes: ~4-8h
+    # Memory scales with pplacer_cpus. Default here fits pplacer_cpus=6
+    # on a 512 GB node. For larger/smaller nodes, override:
+    #   --config gtdbtk.pplacer_cpus=N
+    # and set cluster_mem_gb_per_node so pplacer_cpus is sized correctly.
+    mem_mb: 400000
   gtdbtk_merge:
     runtime: 10
     mem_mb: 4000
-    cpus_per_task: 1
 
-  # Aggregation + dereplication
   merge_reports:
     runtime: 15
     mem_mb: 8000
-    cpus_per_task: 1
   skani_triangle:
-    runtime: 120           # fast even for 10k genomes with enough cores
+    runtime: 120
     mem_mb: 64000
-    cpus_per_task: 32
   dereplicate_cluster:
     runtime: 60
     mem_mb: 16000
-    cpus_per_task: 1
 
 # Group rapid rules so they share a SLURM job and avoid queue overhead.
-# genome_stats is sub-second per MAG; grouping by 4 keeps submission sane.
-group-components: 4
+# Format: "GROUP=COMPONENTS" — requires grouping directive on the rule.
+# Uncomment and adjust if your rules use group directives.
+# group-components:
+#   - "fast=4"

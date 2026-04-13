@@ -6,6 +6,7 @@ from meta_pipeline_magdrep import __version__
 from meta_pipeline_magdrep.config import load_and_merge_config, VALID_STEPS, ConfigError
 from meta_pipeline_magdrep.resources import (
     detect_resources,
+    resolve_execution_resources,
     compute_gtdbtk_pplacer_cpus,
     allocate_threads,
     CHECKM2_CONCURRENT_MEM_GB,
@@ -43,11 +44,22 @@ def main():
               help="Show what would be run without executing.")
 @click.option("--jobs", "-j", default=None, type=int,
               help="Maximum parallel jobs. Overrides config.")
-def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs):
+@click.option("--cluster-cpus", default=None, type=int,
+              help="CPUs per compute node for SLURM/GCP profiles. "
+                   "If not set, SLURM auto-detects via sinfo.")
+@click.option("--cluster-mem-gb", default=None, type=int,
+              help="Memory (GB) per compute node for SLURM/GCP profiles. "
+                   "If not set, SLURM auto-detects via sinfo.")
+def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
+       cluster_cpus, cluster_mem_gb):
     """Run quality assessment on a directory of MAG FASTA files."""
     overrides = {"outdir": str(output_dir)}
     if jobs:
         overrides["max_parallel_jobs"] = jobs
+    if cluster_cpus:
+        overrides["cluster_cpus_per_node"] = cluster_cpus
+    if cluster_mem_gb:
+        overrides["cluster_mem_gb_per_node"] = cluster_mem_gb
 
     try:
         cfg = load_and_merge_config(config_file, overrides)
@@ -70,17 +82,25 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs):
 
     cfg["steps"] = sorted(active_steps)
 
-    # Detect and resolve resources
-    resources = detect_resources()
+    # Detect login-machine resources (always — used for local execution
+    # and for selecting sensible defaults).
+    login_resources = detect_resources()
+
+    # Pick per-job resources based on the execution profile. For SLURM/GCP
+    # we size jobs to a single compute node, not the login node.
+    job_cpus, job_mem_gb, source = resolve_execution_resources(
+        profile, cfg, login_resources,
+    )
+
     if cfg["threads_per_job"] == "auto":
-        cfg["threads_per_job"] = min(resources.cpu_count, 8)
+        cfg["threads_per_job"] = min(job_cpus, 8)
     if cfg["max_parallel_jobs"] == "auto":
-        cfg["max_parallel_jobs"] = max(1, resources.cpu_count)
+        cfg["max_parallel_jobs"] = max(1, job_cpus) if profile == "local" else 500
 
     # Split cores between CheckM2 and GTDB-Tk so they can run concurrently
     # when both are enabled (they have no DAG dependency on each other).
     concurrent = len({"checkm2", "gtdbtk"} & set(cfg["steps"]))
-    threads_alloc = allocate_threads(resources.cpu_count, concurrent)
+    threads_alloc = allocate_threads(job_cpus, concurrent)
     cfg.setdefault("gtdbtk", {})
 
     if cfg.get("checkm2_threads", "auto") == "auto":
@@ -94,17 +114,22 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs):
         if concurrent > 1:
             reserve += CHECKM2_CONCURRENT_MEM_GB
         cfg["gtdbtk"]["pplacer_cpus"] = compute_gtdbtk_pplacer_cpus(
-            resources.mem_gb,
+            job_mem_gb,
             max_cpus=cfg["gtdbtk"]["threads"],
             reserve_gb=reserve,
         )
 
     click.echo(
-        f"Detected: {resources.cpu_count} CPUs, {resources.mem_gb:.0f} GB RAM."
+        f"Sizing jobs for {job_cpus} CPUs, {job_mem_gb:.0f} GB RAM (source: {source})."
     )
+    if profile != "local":
+        click.echo(
+            f"Profile={profile}: each rule will be submitted as a separate job. "
+            f"SLURM/GCP will place jobs across nodes based on available resources."
+        )
     if concurrent > 1:
         click.echo(
-            f"Running CheckM2 + GTDB-Tk concurrently: "
+            f"CheckM2 + GTDB-Tk run concurrently (per batch or per node): "
             f"CheckM2={cfg['checkm2_threads']} threads, "
             f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
             f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
