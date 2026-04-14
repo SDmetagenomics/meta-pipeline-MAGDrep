@@ -37,6 +37,83 @@ def test_assign_quality_score_below_threshold():
     assert assign_quality_tier(row, DEFAULT_QUALITY_CFG) == "low_quality"
 
 
+def test_merge_adds_strain_heterogeneity_from_checkm1(tmp_path):
+    """CheckM1 strain_heterogeneity always lands in the combined report."""
+    indiv = tmp_path / "individual"
+    (indiv / "mag_001").mkdir(parents=True)
+    (indiv / "mag_001" / "genome_stats.tsv").write_text(
+        "mag_id\ttotal_length_bp\tgc_percent\tcontig_count\tn50_bp\tlargest_contig_bp\n"
+        "mag_001\t1000000\t45.0\t10\t200000\t300000\n"
+    )
+    (tmp_path / "checkm1_quality.tsv").write_text(
+        "mag_id\tcheckm1_marker_lineage\tcompleteness\tcontamination\tstrain_heterogeneity\n"
+        "mag_001\tp__Bacteria\t80.0\t3.0\t50.0\n"
+    )
+    (tmp_path / "checkm2_quality.tsv").write_text(
+        "mag_id\tcompleteness\tcontamination\tcompleteness_model_used\n"
+        "mag_001\t85.0\t1.5\tNeural Network\n"
+    )
+
+    combined = tmp_path / "combined.tsv"
+    filtered = tmp_path / "filtered.tsv"
+
+    merge_all_reports(
+        stats_dir=str(indiv),
+        checkm1_path=str(tmp_path / "checkm1_quality.tsv"),
+        checkm2_path=str(tmp_path / "checkm2_quality.tsv"),
+        gtdbtk_path=None,
+        output_combined=str(combined),
+        output_filtered=str(filtered),
+        quality_cfg=DEFAULT_QUALITY_CFG,
+    )
+
+    header, row = combined.read_text().strip().split("\n")
+    cols = header.split("\t")
+    vals = dict(zip(cols, row.split("\t")))
+    # CheckM2 wins on canonical completeness/contamination
+    assert vals["completeness"] == "85.0"
+    assert vals["contamination"] == "1.5"
+    # CheckM1 values preserved side-by-side
+    assert vals["checkm1_completeness"] == "80.0"
+    assert vals["checkm1_contamination"] == "3.0"
+    # Strain het present
+    assert vals["strain_heterogeneity"] == "50.0"
+
+
+def test_merge_checkm1_only_promotes_completeness(tmp_path):
+    """If only CheckM1 ran, its values become the canonical completeness/contamination."""
+    indiv = tmp_path / "individual"
+    (indiv / "mag_001").mkdir(parents=True)
+    (indiv / "mag_001" / "genome_stats.tsv").write_text(
+        "mag_id\ttotal_length_bp\tgc_percent\tcontig_count\tn50_bp\tlargest_contig_bp\n"
+        "mag_001\t1000000\t45.0\t10\t200000\t300000\n"
+    )
+    (tmp_path / "checkm1_quality.tsv").write_text(
+        "mag_id\tcheckm1_marker_lineage\tcompleteness\tcontamination\tstrain_heterogeneity\n"
+        "mag_001\tp__Bacteria\t80.0\t3.0\t50.0\n"
+    )
+
+    combined = tmp_path / "combined.tsv"
+    filtered = tmp_path / "filtered.tsv"
+
+    merge_all_reports(
+        stats_dir=str(indiv),
+        checkm1_path=str(tmp_path / "checkm1_quality.tsv"),
+        checkm2_path=None,
+        gtdbtk_path=None,
+        output_combined=str(combined),
+        output_filtered=str(filtered),
+        quality_cfg=DEFAULT_QUALITY_CFG,
+    )
+
+    header, row = combined.read_text().strip().split("\n")
+    cols = header.split("\t")
+    vals = dict(zip(cols, row.split("\t")))
+    assert vals["completeness"] == "80.0"
+    assert vals["contamination"] == "3.0"
+    assert vals["strain_heterogeneity"] == "50.0"
+
+
 def test_merge_all_reports(tmp_path):
     """Test full merge pipeline with mock data."""
     indiv = tmp_path / "individual"

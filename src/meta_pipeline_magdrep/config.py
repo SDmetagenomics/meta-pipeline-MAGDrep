@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import yaml
 
-VALID_STEPS = {"genome_stats", "checkm2", "gtdbtk", "dereplicate"}
+VALID_STEPS = {"genome_stats", "checkm1", "checkm2", "gtdbtk", "dereplicate"}
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _DEFAULT_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
@@ -160,7 +160,7 @@ def load_and_merge_config(
     cfg["db_dir"] = str(db_dir)
 
     # Resolve per-tool database paths: if null, default to db_dir/<tool>
-    for tool in ("checkm2", "gtdbtk"):
+    for tool in ("checkm1", "checkm2", "gtdbtk"):
         key = f"{tool}_db_path"
         val = cfg.get(key)
         if val:

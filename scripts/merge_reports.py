@@ -74,10 +74,17 @@ def merge_all_reports(
     output_filtered: str,
     quality_cfg: dict,
     output_summary: str | None = None,
+    checkm1_path: str | None = None,
 ) -> None:
     """
     Left-join all reports on mag_id, compute quality tiers,
     write combined and filtered reports.
+
+    If both CheckM1 and CheckM2 ran, the combined report prefers CheckM2's
+    completeness/contamination (neural-net, more accurate). CheckM1 values
+    are preserved as `checkm1_completeness` / `checkm1_contamination` for
+    side-by-side comparison, and `strain_heterogeneity` is always taken
+    from CheckM1 (CheckM2 doesn't emit it).
     """
     # 1. Read all per-MAG genome_stats.tsv files
     stats_rows = []
@@ -90,7 +97,25 @@ def merge_all_reports(
 
     data = {row["mag_id"]: dict(row) for row in stats_rows}
 
-    # 2. Left-join CheckM2
+    # 2a. Left-join CheckM1 first (CheckM2 overwrites completeness/contamination below)
+    if checkm1_path:
+        for row in _read_tsv(checkm1_path):
+            mid = row.get("mag_id", "")
+            if mid not in data:
+                continue
+            # Keep CheckM1 copies side-by-side for comparison
+            data[mid]["checkm1_completeness"] = row.get("completeness", "")
+            data[mid]["checkm1_contamination"] = row.get("contamination", "")
+            data[mid]["strain_heterogeneity"] = row.get("strain_heterogeneity", "")
+            data[mid]["checkm1_marker_lineage"] = row.get("checkm1_marker_lineage", "")
+            # If CheckM2 wasn't also in the run, promote CheckM1's values
+            # to the canonical completeness/contamination fields.
+            if not checkm2_path:
+                data[mid]["completeness"] = row.get("completeness", "")
+                data[mid]["contamination"] = row.get("contamination", "")
+
+    # 2b. Left-join CheckM2 (wins the canonical completeness/contamination
+    # columns when both tools ran)
     if checkm2_path:
         for row in _read_tsv(checkm2_path):
             mid = row.get("mag_id", "")
@@ -116,6 +141,9 @@ def merge_all_reports(
         "mag_id", "total_length_bp", "gc_percent", "contig_count", "n50_bp",
         "largest_contig_bp", "completeness", "contamination",
         "completeness_model_used", "quality_score",
+        # CheckM1-only fields (present when CheckM1 ran)
+        "checkm1_completeness", "checkm1_contamination",
+        "checkm1_marker_lineage", "strain_heterogeneity",
         "domain", "phylum", "class", "order", "family", "genus", "species",
         "classification", "fastani_reference", "fastani_ani", "fastani_af",
         "classification_method", "quality_tier",
@@ -179,6 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--stats-dir", required=True)
     parser.add_argument("--checkm2", default=None)
     parser.add_argument("--gtdbtk", default=None)
+    parser.add_argument("--checkm1", default=None)
     parser.add_argument("--output-combined", required=True)
     parser.add_argument("--output-filtered", required=True)
     parser.add_argument("--output-summary", default=None)
@@ -196,6 +225,7 @@ if __name__ == "__main__":
 
     merge_all_reports(
         stats_dir=args.stats_dir,
+        checkm1_path=args.checkm1 if args.checkm1 else None,
         checkm2_path=args.checkm2 if args.checkm2 else None,
         gtdbtk_path=args.gtdbtk if args.gtdbtk else None,
         output_combined=args.output_combined,

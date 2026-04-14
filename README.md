@@ -8,7 +8,7 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-9.16-039475?logo=snakemake&logoColor=white)](https://snakemake.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-58%2F58%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-1.2.0-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-1.3.0-brightgreen)]()
 
 </div>
 
@@ -59,11 +59,26 @@ Need more detail? See the [**Program Guide**](docs/program-guide.md) for rationa
 | Step | Tool | What | Database |
 |---|---|---|---|
 | `genome_stats` | SeqKit 2.13 | Length, GC, N50, contig count | — |
+| `checkm1` *(optional)* | CheckM1 1.2.5 | Marker-gene completeness/contamination + **strain heterogeneity** | CheckM1 DB (~1.4 GB) |
 | `checkm2` | CheckM2 1.1.0 | Completeness + contamination (neural net) | CheckM2 diamond DB (~3 GB) |
 | `gtdbtk` | GTDB-Tk 2.5.2 | Taxonomy — GTDB release 226 | GTDB-Tk r226 (~85 GB) |
 | `dereplicate` | skani 0.3.1 + scipy | Species clustering (UPGMA at 95% ANI) | — |
 
-Each step is batched so memory stays bounded on 10k+ genome datasets. CheckM2 and GTDB-Tk run **concurrently** by default and can be routed to different SLURM partitions.
+Each step is batched so memory stays bounded on 10k+ genome datasets. CheckM1, CheckM2, and GTDB-Tk run **concurrently** by default and can be routed to different SLURM partitions.
+
+**Running CheckM1.** By default only CheckM2 runs. To add CheckM1 (or swap for it), include it in `--steps`:
+
+```bash
+# CheckM1 + CheckM2 side-by-side (unlocks strain_heterogeneity for the composite score)
+meta-pipeline-MAGDrep run -i mags/ -o results/ \
+    --steps genome_stats,checkm1,checkm2,gtdbtk,dereplicate
+
+# Only CheckM1 (skip CheckM2 entirely)
+meta-pipeline-MAGDrep run -i mags/ -o results/ --skip checkm2 \
+    --steps genome_stats,checkm1,gtdbtk,dereplicate
+```
+
+When both run, CheckM2 values populate the canonical `completeness` / `contamination` columns (better neural-net model), CheckM1 values are preserved as `checkm1_completeness` / `checkm1_contamination`, and **strain heterogeneity** is always from CheckM1 — which activates the `C` term in the dereplication composite score.
 
 ---
 

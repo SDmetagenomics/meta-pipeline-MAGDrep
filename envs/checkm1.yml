@@ -1,0 +1,19 @@
+# Side environment for CheckM1.
+#
+# CheckM1 (ecogenomics/CheckM) needs Python <3.12, while CheckM2 1.1.0
+# requires Python >3.12 (odd constraint — see conda recipe). The two
+# cannot coexist on one interpreter, so MAGDrep keeps CheckM1 in its
+# own env. `make install` creates both; the Dockerfile bundles both.
+#
+# scripts/run_checkm1.py invokes checkm via `conda run -n magdrep-checkm1`.
+name: magdrep-checkm1
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - checkm-genome=1.2.5
+  - pplacer=1.1.alpha22
+  - hmmer=3.4
+  - prodigal=2.6.3
+  - pysam

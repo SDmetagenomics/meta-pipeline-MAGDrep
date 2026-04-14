@@ -214,17 +214,21 @@ def allocate_threads(
 ) -> dict[str, int]:
     """Split CPU budget across concurrent pipeline steps.
 
-    When CheckM2 and GTDB-Tk run back-to-back (one active step), each job
-    can claim all CPUs. When they run concurrently (two active steps),
-    split roughly in half so Snakemake schedules them in parallel.
+    With 1 active step, it claims all CPUs. With 2 or 3 active, divides
+    roughly evenly (GTDB-Tk gets any remainder — classify_wf parallelizes
+    the most cleanly).
 
-    Returns {"checkm2": N, "gtdbtk": N}.
+    Returns {"checkm1": N, "checkm2": N, "gtdbtk": N}.
     """
     if concurrent_steps <= 1:
-        return {"checkm2": cpu_count, "gtdbtk": cpu_count}
-    # Leave 1 core for Snakemake orchestration / genome_stats on small systems
+        return {"checkm1": cpu_count, "checkm2": cpu_count, "gtdbtk": cpu_count}
+
     usable = max(2, cpu_count)
-    half = max(1, usable // 2)
-    # Prefer slightly more CPU for GTDB-Tk (classify_wf parallelizes well)
-    # and slightly less for CheckM2 (saturates at ~8 threads anyway)
-    return {"checkm2": half, "gtdbtk": usable - half}
+    share = max(1, usable // max(concurrent_steps, 2))
+    # GTDB-Tk gets any leftover cores
+    remainder = max(1, usable - share * (concurrent_steps - 1))
+    return {
+        "checkm1": share,
+        "checkm2": share,
+        "gtdbtk": remainder,
+    }

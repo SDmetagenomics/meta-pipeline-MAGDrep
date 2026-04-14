@@ -1,5 +1,5 @@
 rule merge_reports:
-    """Left-join genome_stats + checkm2 + gtdbtk on mag_id, assign quality tiers.
+    """Left-join genome_stats + checkm1 + checkm2 + gtdbtk on mag_id, assign quality tiers.
 
     Produces three top-level reports:
       - combined_report.tsv: every column from every tool
@@ -8,6 +8,7 @@ rule merge_reports:
     """
     input:
         stats=expand(str(OUTDIR / "genome_stats" / "{mag_id}" / "genome_stats.tsv"), mag_id=MAG_IDS),
+        checkm1=str(OUTDIR / "checkm1" / "checkm1_quality.tsv") if "checkm1" in STEPS else [],
         checkm2=str(OUTDIR / "checkm2" / "checkm2_quality.tsv") if "checkm2" in STEPS else [],
         gtdbtk=str(OUTDIR / "gtdbtk" / "gtdbtk_taxonomy.tsv") if "gtdbtk" in STEPS else [],
     output:
@@ -26,6 +27,8 @@ rule merge_reports:
             "--output-filtered", output.filtered,
             "--output-summary", output.summary,
         ]
+        if "checkm1" in STEPS:
+            cmd += ["--checkm1", str(OUTDIR / "checkm1" / "checkm1_quality.tsv")]
         if "checkm2" in STEPS:
             cmd += ["--checkm2", str(OUTDIR / "checkm2" / "checkm2_quality.tsv")]
         if "gtdbtk" in STEPS:

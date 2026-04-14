@@ -4,8 +4,9 @@
 # Output directory
 outdir: results
 
-# Steps to run (all enabled by default)
-# Valid values: genome_stats, checkm2, gtdbtk, dereplicate
+# Steps to run (defaults below; add "checkm1" to enable CheckM1 alongside
+# or instead of CheckM2).
+# Valid values: genome_stats, checkm1, checkm2, gtdbtk, dereplicate
 steps:
   - genome_stats
   - checkm2
@@ -16,9 +17,10 @@ steps:
 threads_per_job: auto
 max_parallel_jobs: auto
 
-# Per-tool thread allocation. When both CheckM2 and GTDB-Tk are active,
-# "auto" splits cores between them so they run concurrently (no DAG
-# dependency). Set an integer to override.
+# Per-tool thread allocation. When multiple tools (checkm1/checkm2/gtdbtk)
+# are active, "auto" splits cores between them so they run concurrently
+# (no DAG dependency). Set an integer to override.
+checkm1_threads: auto
 checkm2_threads: auto
 
 # Global batch size for batch-mode tools (CheckM2, GTDB-Tk).
@@ -26,8 +28,9 @@ checkm2_threads: auto
 batch_size: 1000
 
 # Per-tool batch size overrides (null = use batch_size).
-# - CheckM2 benefits from smaller batches on cluster/cloud (more parallel jobs)
+# - CheckM1/CheckM2 benefit from smaller batches on cluster/cloud (more parallel jobs)
 # - GTDB-Tk benefits from larger batches (amortizes database load)
+checkm1_batch_size: null
 checkm2_batch_size: null
 gtdbtk_batch_size: null
 
@@ -44,16 +47,19 @@ fasta_extensions:
 db_dir: databases
 
 # Optional: paths to pre-existing databases (null = expect in db_dir)
+checkm1_db_path: null
 checkm2_db_path: null
 gtdbtk_db_path: null
 
 # Pinned tool and database versions
 tool_versions:
+  checkm1: "1.2.5"
   checkm2: "1.1.0"
   gtdbtk: "2.5.2"
   skani: "0.3.1"
   seqkit: "2.13.0"
 db_versions:
+  checkm1: "2015-01-16"  # CheckM1 DB (marker gene HMMs + trees)
   checkm2: "2.0.0"       # CheckM2 diamond DB bundled with checkm2 1.1.0
   gtdbtk: "r226"
 

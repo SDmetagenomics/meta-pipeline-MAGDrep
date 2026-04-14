@@ -11,7 +11,7 @@ CONFIG_YAML = Path(__file__).parent.parent / "config" / "config.yaml"
 
 
 def test_valid_steps_contains_all_expected():
-    expected = {"genome_stats", "checkm2", "gtdbtk", "dereplicate"}
+    expected = {"genome_stats", "checkm1", "checkm2", "gtdbtk", "dereplicate"}
     assert VALID_STEPS == expected
 
 

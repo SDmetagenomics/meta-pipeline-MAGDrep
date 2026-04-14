@@ -13,6 +13,11 @@ from pathlib import Path
 
 # Database metadata: tool CLI commands and expected artifacts
 DATABASES = {
+    "checkm1": {
+        "display_name": "CheckM1 (2015-01-16)",
+        "size_hint": "~1.4 GB",
+        "sentinel": "checkm1.ok",
+    },
     "checkm2": {
         "display_name": "CheckM2",
         "size_hint": "~3 GB",
@@ -24,6 +29,51 @@ DATABASES = {
         "sentinel": "gtdbtk.ok",
     },
 }
+
+
+CHECKM1_DB_URL = "https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz"
+CHECKM1_ENV = "magdrep-checkm1"
+
+
+def download_checkm1(db_dir: Path, force: bool = False) -> Path:
+    """Download and unpack CheckM1 reference data."""
+    checkm1_dir = db_dir / "checkm1"
+    sentinel = checkm1_dir / DATABASES["checkm1"]["sentinel"]
+
+    if sentinel.exists() and not force:
+        print(f"  CheckM1 database already present (sentinel: {sentinel})")
+        return checkm1_dir
+
+    checkm1_dir.mkdir(parents=True, exist_ok=True)
+    tarball = checkm1_dir / "checkm_data_2015_01_16.tar.gz"
+
+    print("  Downloading CheckM1 database (~1.4 GB)...")
+    subprocess.run(["curl", "-L", "-o", str(tarball), CHECKM1_DB_URL], check=True)
+
+    print("  Extracting CheckM1 archive...")
+    subprocess.run(["tar", "xzf", str(tarball), "-C", str(checkm1_dir)], check=True)
+    tarball.unlink()
+
+    # Verify a canonical marker-set file is present
+    marker_file = checkm1_dir / "selected_marker_sets.tsv"
+    if not marker_file.exists():
+        # Some tarballs nest the files one level deep — detect and flatten.
+        nested = list(checkm1_dir.glob("*/selected_marker_sets.tsv"))
+        if nested:
+            from shutil import move
+            inner = nested[0].parent
+            for item in inner.iterdir():
+                move(str(item), str(checkm1_dir / item.name))
+            inner.rmdir()
+
+    if not (checkm1_dir / "selected_marker_sets.tsv").exists():
+        raise RuntimeError(
+            f"CheckM1 download completed but selected_marker_sets.tsv missing in {checkm1_dir}"
+        )
+
+    sentinel.touch()
+    print(f"  CheckM1 ready at {checkm1_dir}")
+    return checkm1_dir
 
 
 def download_checkm2(db_dir: Path, force: bool = False) -> Path:
@@ -106,6 +156,7 @@ def download_gtdbtk(db_dir: Path, force: bool = False) -> Path:
 
 
 _DOWNLOADERS = {
+    "checkm1": download_checkm1,
     "checkm2": download_checkm2,
     "gtdbtk": download_gtdbtk,
 }

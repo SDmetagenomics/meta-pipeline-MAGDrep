@@ -181,18 +181,35 @@ def run(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
     # When rules run on the same partition (same node pool), they contend
     # for CPUs, so split allocations. When on different partitions, each
     # rule gets its full partition's CPU budget.
-    concurrent = len({"checkm2", "gtdbtk"} & set(cfg["steps"]))
+    # checkm1 and checkm2 both stay on the standard partition; gtdbtk may
+    # route to a memory partition (distinct_memory=True).
+    active_standard = {"checkm1", "checkm2"} & set(cfg["steps"])
+    gtdbtk_active = "gtdbtk" in cfg["steps"]
+    concurrent = len(active_standard) + (1 if gtdbtk_active and not distinct_memory else 0)
+
     if concurrent > 1 and not distinct_memory:
         threads_alloc = allocate_threads(std_cpus, concurrent)
+        checkm1_threads = threads_alloc["checkm1"]
         checkm2_threads = threads_alloc["checkm2"]
         gtdbtk_threads = threads_alloc["gtdbtk"]
-        # Reserve memory for a concurrent CheckM2 batch on same node
-        pplacer_reserve = SYSTEM_OVERHEAD_GB + CHECKM2_CONCURRENT_MEM_GB
+        # Reserve memory for concurrent CheckM batches on same node
+        pplacer_reserve = SYSTEM_OVERHEAD_GB + CHECKM2_CONCURRENT_MEM_GB * len(active_standard)
     else:
-        checkm2_threads = std_cpus
+        # When checkm1 + checkm2 both run on the standard partition alongside
+        # GTDB-Tk on a separate memory partition, checkm1 and checkm2 still
+        # contend with each other — split the standard partition between them.
+        if distinct_memory and len(active_standard) > 1:
+            ck_share = max(1, std_cpus // len(active_standard))
+            checkm1_threads = ck_share
+            checkm2_threads = ck_share
+        else:
+            checkm1_threads = std_cpus
+            checkm2_threads = std_cpus
         gtdbtk_threads = mem_cpus
         pplacer_reserve = SYSTEM_OVERHEAD_GB
 
+    if cfg.get("checkm1_threads", "auto") == "auto":
+        cfg["checkm1_threads"] = checkm1_threads
     if cfg.get("checkm2_threads", "auto") == "auto":
         cfg["checkm2_threads"] = checkm2_threads
     if cfg["gtdbtk"].get("threads", "auto") == "auto":
@@ -215,22 +232,26 @@ def run(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
     if profile == "local":
         click.echo(f"Sizing jobs for {std_cpus} CPUs, {std_mem_gb:.0f} GB RAM (source: {std_source}).")
     elif distinct_memory:
+        ck_routes = ", ".join(sorted(active_standard)) or "(none)"
         click.echo(
             f"Standard nodes ({std_partition}): {std_cpus} CPUs, {std_mem_gb:.0f} GB "
             f"(source: {std_source}).\n"
             f"Memory nodes ({mem_partition}): {mem_cpus} CPUs, {mem_mem_gb:.0f} GB "
             f"(source: {mem_source}).\n"
-            f"CheckM2 routes to {std_partition}; GTDB-Tk routes to {mem_partition}."
+            f"{ck_routes} route to {std_partition}; GTDB-Tk routes to {mem_partition}."
         )
     else:
         click.echo(f"Sizing jobs for {std_cpus} CPUs, {std_mem_gb:.0f} GB RAM (source: {std_source}).")
         click.echo(f"Profile={profile}: SLURM/GCP handles node placement.")
 
-    click.echo(
-        f"CheckM2={cfg['checkm2_threads']} threads, "
-        f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, "
-        f"pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}."
-    )
+    active_threads = []
+    if "checkm1" in cfg["steps"]:
+        active_threads.append(f"CheckM1={cfg['checkm1_threads']} threads")
+    if "checkm2" in cfg["steps"]:
+        active_threads.append(f"CheckM2={cfg['checkm2_threads']} threads")
+    if "gtdbtk" in cfg["steps"]:
+        active_threads.append(f"GTDB-Tk={cfg['gtdbtk']['threads']} threads, pplacer_cpus={cfg['gtdbtk']['pplacer_cpus']}")
+    click.echo(", ".join(active_threads) + ".")
 
     from meta_pipeline_magdrep.runner import run_snakemake
     run_snakemake(
