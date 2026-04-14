@@ -4,9 +4,25 @@
 
 - Python 3.11 or later
 - Snakemake 9.x
-- External bioinformatics tools (see below)
+- Conda or Mamba
 
-## Option 1: pip (Recommended for Development)
+## Option 1: make install (Recommended)
+
+```bash
+git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
+cd meta-pipeline-MAGDrep
+make install
+conda activate magdrep
+```
+
+`make install` creates two conda environments:
+
+- **magdrep** -- main environment with CheckM2, GTDB-Tk, skani, SeqKit, and the pipeline itself
+- **magdrep-checkm1** -- sibling environment for the optional CheckM1 step (incompatible Python version with CheckM2)
+
+The pipeline invokes CheckM1 automatically via `conda run` when `checkm1` is included in `--steps`.
+
+## Option 2: pip (Development)
 
 ```bash
 git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
@@ -18,17 +34,7 @@ You must install the external tools separately. The easiest method is conda/mamb
 
 ```bash
 mamba install -c conda-forge -c bioconda \
-  seqkit=2.8 checkm2=1.0.2 diamond=2.1 prodigal=2.6 \
-  gtdbtk=2.5 skani=0.2
-pip install "gunc>=1.1.0"
-```
-
-## Option 2: Conda Environment
-
-```bash
-mamba env create -f container/environment.yml
-mamba activate magdrep
-pip install -e . --no-deps
+  seqkit checkm2 gtdbtk skani
 ```
 
 ## Option 3: Docker
@@ -36,15 +42,22 @@ pip install -e . --no-deps
 ```bash
 docker build -t meta-pipeline-magdrep .
 docker run -v /path/to/dbs:/databases -v /path/to/mags:/input \
-  meta-pipeline-magdrep qc -i /input -o /output
+  meta-pipeline-magdrep run -i /input -o /output
 ```
 
 ## Database Downloads
 
-Each tool requires a reference database. Use the built-in downloader:
+CheckM2 and GTDB-Tk require reference databases. Use the built-in downloader:
 
 ```bash
 meta-pipeline-MAGDrep db update --db-dir /data/magdrep_dbs
+```
+
+The `--db-dir` path is saved persistently so future commands find it automatically. Alternatively, set the `MAGDREP_DB_DIR` environment variable:
+
+```bash
+export MAGDREP_DB_DIR=/data/magdrep_dbs
+meta-pipeline-MAGDrep db update
 ```
 
 Or download manually:
@@ -52,7 +65,7 @@ Or download manually:
 | Database | Command | Size |
 |----------|---------|------|
 | CheckM2 | `checkm2 database --download --path /data/magdrep_dbs/checkm2` | ~3 GB |
-| GUNC | `gunc download_db /data/magdrep_dbs/gunc --db gtdb_214` | ~14 GB |
+| CheckM1 (optional) | `checkm data setRoot /data/magdrep_dbs/checkm1` | ~1.4 GB |
 | GTDB-Tk | `download-db.sh /data/magdrep_dbs/gtdbtk` | ~85 GB |
 
 ## Verify Installation

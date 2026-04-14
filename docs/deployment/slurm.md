@@ -8,6 +8,7 @@ Snakemake rule as a separate SLURM job via `snakemake-executor-plugin-slurm`.
 - SLURM cluster with submission from the login node
 - The `magdrep` conda env available on every compute node (either in a
   shared filesystem or via module system)
+- The `magdrep-checkm1` conda env also available if CheckM1 is enabled
 - Databases on a shared filesystem accessible to all nodes
 
 ## Usage
@@ -32,7 +33,7 @@ meta-pipeline-MAGDrep run \
 - **`tmpdir: /tmp/$SLURM_JOB_ID`**: node-local scratch for GTDB-Tk intermediate files
   (falls back to GTDB-Tk's default if not set). `run_gtdbtk.py` auto-detects
   `$TMPDIR` and passes it as `--scratch_dir`.
-- **Up to 500 concurrent jobs** (`jobs: 500`) — raise to your partition's cap.
+- **Up to 500 concurrent jobs** (`jobs: 500`) -- raise to your partition's cap.
 
 ## Heterogeneous clusters (standard + memory partitions)
 
@@ -48,9 +49,9 @@ meta-pipeline-MAGDrep run -i mags/ -o results/ --profile slurm \
 ```
 
 Result:
-- `checkm2_batch`, `skani_triangle`, `genome_stats`, etc. → `standard` partition,
+- `checkm2_batch`, `skani_triangle`, `genome_stats`, etc. run on the `standard` partition,
   each job sized to standard node (64 CPU / 256 GB).
-- `gtdbtk_batch` → `memory` partition, each job sized to memory node
+- `gtdbtk_batch` runs on the `memory` partition, each job sized to memory node
   (96 CPU / 1 TB, supporting ~16 pplacer CPUs).
 
 If the `--cluster-mem-node-*` flags are omitted they fall back to the standard
@@ -97,6 +98,8 @@ if many jobs load it concurrently. Options:
    rather than the slow scratch / home directory.
 3. **Symlink from a cluster-wide reference location**: use the lab's shared
    database directory if one exists.
+
+Set `MAGDREP_DB_DIR` in your shell profile or use `meta-pipeline-MAGDrep db update --db-dir /shared/lab/dbs` (the path is saved persistently to the conda env).
 
 ## Monitoring
 

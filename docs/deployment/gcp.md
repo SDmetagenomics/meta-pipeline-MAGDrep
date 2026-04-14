@@ -11,9 +11,9 @@ For 10,000 MAGs (rough, us-central1 pricing as of 2026):
 
 | Stage | Machines | Total | Notes |
 |---|---|---|---|
-| CheckM2 (50×200-MAG batches) | 50× n2-standard-16 preemptible | ~$20 | ~3h each, preemptible |
-| GTDB-Tk (10×1000-MAG batches) | 10× n2-highmem-32 | ~$150 | ~8h each, standard (preemption costly) |
-| skani triangle | 1× n2-standard-32 | ~$3 | ~30 min |
+| CheckM2 (50x200-MAG batches) | 50x n2-standard-16 preemptible | ~$20 | ~3h each, preemptible |
+| GTDB-Tk (10x1000-MAG batches) | 10x n2-highmem-32 | ~$150 | ~8h each, standard (preemption costly) |
+| skani triangle | 1x n2-standard-32 | ~$3 | ~30 min |
 | Orchestration + small rules | various e2 | ~$2 | |
 | **Total** | | **~$175** | |
 
@@ -47,7 +47,7 @@ gsutil mb -l us-central1 gs://my-magdrep-bucket
 
 ### 2. Put your databases on GCS (or a persistent disk)
 
-**Option A — copy to GCS once, mount at runtime with gcsfuse:**
+**Option A -- copy to GCS once, mount at runtime with gcsfuse:**
 
 ```bash
 gsutil -m cp -r databases/checkm2 gs://my-magdrep-bucket/databases/checkm2
@@ -57,7 +57,7 @@ gsutil -m cp -r databases/gtdbtk gs://my-magdrep-bucket/databases/gtdbtk
 Then add a container startup script that runs `gcsfuse` to mount the bucket
 at `/databases/` inside each job (see the Dockerfile section below).
 
-**Option B — bake databases into a custom VM image (faster boot, no mount):**
+**Option B -- bake databases into a custom VM image (faster boot, no mount):**
 
 Snapshot a disk containing the databases and reference it in the profile:
 
@@ -65,7 +65,7 @@ Snapshot a disk containing the databases and reference it in the profile:
 googlebatch-boot-disk-image: projects/YOUR_PROJECT/global/images/magdrep-dbs-v1
 ```
 
-**Option C — mount a persistent-disk snapshot read-only on every job:**
+**Option C -- mount a persistent-disk snapshot read-only on every job:**
 
 Each job attaches the disk at `/databases/`. Scales poorly beyond a few
 dozen concurrent jobs because GCE persistent-disk snapshots have
@@ -84,6 +84,7 @@ RUN micromamba install -y -n base -f /tmp/environment.yml && \
     micromamba clean --all --yes
 COPY . /opt/magdrep
 RUN cd /opt/magdrep && pip install -e .
+ENV MAGDREP_DB_DIR=/databases
 # Optional: install gcsfuse if using Option A
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -93,8 +94,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 Build and push:
 
 ```bash
-docker build -t gcr.io/YOUR_PROJECT/magdrep:v0.1 .
-docker push gcr.io/YOUR_PROJECT/magdrep:v0.1
+docker build -t gcr.io/YOUR_PROJECT/magdrep:v1.3 .
+docker push gcr.io/YOUR_PROJECT/magdrep:v1.3
 ```
 
 ### 4. Export environment variables
@@ -103,7 +104,7 @@ docker push gcr.io/YOUR_PROJECT/magdrep:v0.1
 export GOOGLE_BATCH_PROJECT=YOUR_PROJECT_ID
 export GOOGLE_BATCH_REGION=us-central1
 export GOOGLE_BATCH_BUCKET=my-magdrep-bucket
-export MAGDREP_CONTAINER=gcr.io/YOUR_PROJECT/magdrep:v0.1
+export MAGDREP_CONTAINER=gcr.io/YOUR_PROJECT/magdrep:v1.3
 ```
 
 ## Running
@@ -112,7 +113,7 @@ export MAGDREP_CONTAINER=gcr.io/YOUR_PROJECT/magdrep:v0.1
 # Upload MAGs to GCS
 gsutil -m cp mags/*.fna gs://my-magdrep-bucket/mags/
 
-# Run pipeline — inputs and outputs on GCS
+# Run pipeline -- inputs and outputs on GCS
 meta-pipeline-MAGDrep run \
     -i gs://my-magdrep-bucket/mags/ \
     -o gs://my-magdrep-bucket/runs/2026-04/ \
@@ -125,7 +126,7 @@ gcloud batch jobs list --location=us-central1
 
 ## Tuning
 
-**Batch sizes.** CheckM2 with `batch_size=200` creates many small jobs → more
+**Batch sizes.** CheckM2 with `batch_size=200` creates many small jobs -- more
 parallelism, more preemptibility. GTDB-Tk with `batch_size=1000` amortizes
 the ~85 GB database load.
 
@@ -136,8 +137,8 @@ GTDB-Tk `gtdbtk_batch` is hitting the memory ceiling, bump to
 
 **Quota.** Default Batch quotas in a fresh project are small. Request
 increases for:
-- CPUs in your region (default 72 → request 1000+)
-- Disk space per region (default 5 TB → request 20 TB+)
+- CPUs in your region (default 72 -- request 1000+)
+- Disk space per region (default 5 TB -- request 20 TB+)
 
 **Region.** `us-central1` and `us-east1` have the most Batch capacity and
 the lowest prices. `europe-west4` and `asia-east1` are fine alternatives.

@@ -17,11 +17,13 @@ Assign taxonomic classifications to MAGs using the Genome Taxonomy Database (GTD
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `batch_size` | 1000 | Genomes per GTDB-Tk invocation |
-| `threads_per_job` | 4 | Threads per batch (pplacer uses ~85 GB RAM) |
-| `db_versions.gtdbtk` | `r226` | GTDB release version |
+| `gtdbtk.threads` | auto | Threads per batch (auto = detect available CPUs) |
+| `gtdbtk.pplacer_cpus` | auto | pplacer threads (auto = scale with available memory, ~60 GB per pplacer cpu for R226) |
+| `gtdbtk.skip_ani_screen` | false | Skip ANI pre-screen against reference genomes |
+| `gtdbtk_batch_size` | null | Override batch size (null = use global `batch_size`) |
 
 !!! warning "Memory requirement"
-    GTDB-Tk's pplacer step requires approximately **85 GB of RAM** for the full GTDB R10-RS226 database. Ensure your system or SLURM job has sufficient memory.
+    GTDB-Tk's pplacer step requires approximately **85 GB of RAM** for the full GTDB R10-RS226 database. Ensure your system or SLURM job has sufficient memory. The pipeline auto-tunes `pplacer_cpus` based on available memory when set to `auto`.
 
 ## Database
 
@@ -32,6 +34,8 @@ meta-pipeline-MAGDrep db update
 # or manually:
 download-db.sh databases/gtdbtk
 ```
+
+The database path is resolved from `$MAGDREP_DB_DIR`, persistent config, or `./databases/`.
 
 ## Columns Produced
 
@@ -52,4 +56,4 @@ download-db.sh databases/gtdbtk
 1. Genomes are batched and classified with `gtdbtk classify_wf`.
 2. GTDB-Tk runs marker gene identification (Prodigal), alignment (hmmer), and tree placement (pplacer).
 3. Bacterial (bac120) and archaeal (ar53) summary files are parsed and merged.
-4. Results are written to `gtdbtk_taxonomy.tsv`.
+4. Results are written to `gtdbtk/gtdbtk_taxonomy.tsv`.

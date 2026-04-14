@@ -17,12 +17,25 @@ Nested dictionaries are deep-merged: user values replace defaults at the leaf le
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `outdir` | `results` | Output directory |
-| `steps` | all five | Pipeline steps to run, in order |
+| `steps` | `genome_stats, checkm2, gtdbtk, dereplicate` | Pipeline steps to run, in order |
 | `batch_size` | `1000` | Number of genomes per batch (controls memory) |
-| `threads_per_job` | `4` | CPU threads allocated to each tool invocation |
-| `max_parallel_jobs` | `8` | Maximum concurrent Snakemake jobs |
+| `threads_per_job` | `auto` | CPU threads allocated to each tool invocation (auto = detect) |
+| `max_parallel_jobs` | `auto` | Maximum concurrent Snakemake jobs (auto = detect) |
 | `fasta_extensions` | `.fna`, `.fa`, `.fasta` (+ `.gz`) | Recognized input extensions |
 | `db_dir` | `databases` | Root directory for reference databases |
+
+Valid steps: `genome_stats`, `checkm1` (optional), `checkm2`, `gtdbtk`, `dereplicate`.
+
+### Database Configuration
+
+The pipeline resolves `db_dir` in this order:
+
+1. `--db-dir` flag (per-command)
+2. `$MAGDREP_DB_DIR` environment variable
+3. Persistent config saved by `db update --db-dir`
+4. Default `./databases/`
+
+Running `meta-pipeline-MAGDrep db update --db-dir /path` saves the path persistently to the conda environment so future invocations find databases automatically.
 
 ### Quality Filter
 
@@ -33,7 +46,6 @@ quality_filter:
   medium_completeness: 60.0
   medium_contamination: 10.0
   min_quality_score: 50.0
-  gunc_css_threshold: 0.45
   default_filter: medium_quality
 ```
 
@@ -45,15 +57,45 @@ The `default_filter` controls which tier is the minimum for inclusion in `filter
 dereplicate:
   ani_threshold: 95.0       # Species boundary (%)
   min_af: 10.0              # Minimum alignment fraction (%)
+  min_completeness: 60.0    # Completeness gate for representative selection
   score_weights:
-    w_qscore: 1.0           # quality_score weight
-    w_completeness: 1.0     # completeness weight
-    w_n50: 0.5              # N50 weight
-    w_contam: 0.5           # contamination penalty weight
-    w_gunc: 0.5             # GUNC pass bonus weight
+    A: 1.0    # completeness weight
+    B: 5.0    # contamination weight
+    C: 1.0    # strain-heterogeneity x contamination weight
+    D: 0.5    # log10(N50) weight
+    E: 0.0    # log10(genome_size) weight
 ```
 
-The composite score ranks genomes within each species cluster to select the best representative.
+The composite score ranks genomes within each species cluster to select the best representative. Only genomes with at least `min_completeness` (default 60%) are eligible as representatives.
+
+### Composite Score Formula
+
+```
+score = A * Completeness
+      - B * Contamination
+      + C * (Contamination * strain_heterogeneity / 100)
+      + D * log10(N50)
+      + E * log10(genome_size)
+```
+
+The `C` term uses strain heterogeneity from CheckM1; when only CheckM2 is run, strain heterogeneity is 0 and the term drops out.
+
+### CheckM1 (Optional)
+
+```yaml
+steps:
+  - genome_stats
+  - checkm1         # add this line to enable
+  - checkm2
+  - gtdbtk
+  - dereplicate
+
+checkm1_threads: auto
+checkm1_pplacer_threads: 4
+checkm1_batch_size: null    # null = use batch_size; small batches recommended
+```
+
+CheckM1 runs in the sibling `magdrep-checkm1` conda environment. It provides `strain_heterogeneity`, which feeds into the dereplication composite score (the `C` term).
 
 ## Example Custom Config
 
@@ -62,9 +104,9 @@ The composite score ranks genomes within each species cluster to select the best
 batch_size: 500
 quality_filter:
   default_filter: high_quality
-  gunc_css_threshold: 0.50
 dereplicate:
   ani_threshold: 96.0
+  min_completeness: 70.0
 ```
 
 ```bash

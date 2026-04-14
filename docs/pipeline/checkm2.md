@@ -6,7 +6,7 @@ Estimate genome completeness and contamination using a gradient-boosted machine 
 
 ## Tool
 
-**CheckM2** v1.0.2
+**CheckM2** v1.1.0
 
 > Chklovski A, Parks DH, Woodcroft BJ, Tyson GW (2023) CheckM2: a rapid, scalable and accurate tool for assessing microbial genome quality using machine learning. *Nature Methods*, 20:1203--1212.
 
@@ -15,8 +15,8 @@ Estimate genome completeness and contamination using a gradient-boosted machine 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `batch_size` | 1000 | Genomes per CheckM2 invocation |
-| `threads_per_job` | 4 | Threads per batch |
-| `db_versions.checkm2` | `1.0.2` | Database version |
+| `checkm2_threads` | auto | Threads per batch (auto = split cores with concurrent tools) |
+| `checkm2_batch_size` | null | Override batch size (null = use global `batch_size`) |
 
 ## Database
 
@@ -27,6 +27,8 @@ meta-pipeline-MAGDrep db update
 # or manually:
 checkm2 database --download --path databases/checkm2
 ```
+
+The database path is resolved from `$MAGDREP_DB_DIR`, persistent config, or `./databases/`.
 
 ## Columns Produced
 
@@ -40,5 +42,11 @@ checkm2 database --download --path databases/checkm2
 
 1. Input genomes are batched into groups of `batch_size`.
 2. Each batch is run through `checkm2 predict`.
-3. Per-batch results are merged into `checkm2_quality.tsv`.
+3. Per-batch results are merged into `checkm2/checkm2_quality.tsv`.
 4. Completeness and contamination feed into quality tier assignment and the composite dereplication score.
+
+## CheckM1 (Optional Alternative)
+
+For strain heterogeneity data (used by the dereplication composite score), you can also enable CheckM1 by adding `checkm1` to `--steps`. CheckM1 runs in a sibling conda environment (`magdrep-checkm1`) because its Python requirements are incompatible with CheckM2. Both tools can run in the same pipeline -- their results are merged in the combined report.
+
+See [Configuration](../usage/configuration.md) for CheckM1-specific settings.
