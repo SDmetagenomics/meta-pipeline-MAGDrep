@@ -29,8 +29,9 @@ rule checkm1_batch:
     params:
         outdir=str(OUTDIR / "checkm1" / "batches" / "{batch_id}" / "raw"),
         db_path=config.get("checkm1_db_path", ""),
+        pplacer_threads=cfg_int("checkm1_pplacer_threads", 4),
     shell:
-        "python scripts/run_checkm1.py {input.batch_dir} {params.outdir} {output.results} {threads} {params.db_path}"
+        "python scripts/run_checkm1.py {input.batch_dir} {params.outdir} {output.results} {threads} {params.db_path} {params.pplacer_threads}"
 
 
 rule checkm1_merge:

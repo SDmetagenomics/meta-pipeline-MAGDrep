@@ -21,6 +21,10 @@ max_parallel_jobs: auto
 # are active, "auto" splits cores between them so they run concurrently
 # (no DAG dependency). Set an integer to override.
 checkm1_threads: auto
+# pplacer threads for CheckM1. pplacer doesn't scale well beyond ~4 threads
+# (lock contention). Higher values can deadlock on macOS. Override only if
+# your system handles it — most users should leave the default.
+checkm1_pplacer_threads: 4
 checkm2_threads: auto
 
 # Global batch size for batch-mode tools (CheckM2, GTDB-Tk).
@@ -28,8 +32,10 @@ checkm2_threads: auto
 batch_size: 1000
 
 # Per-tool batch size overrides (null = use batch_size).
-# - CheckM1/CheckM2 benefit from smaller batches on cluster/cloud (more parallel jobs)
-# - GTDB-Tk benefits from larger batches (amortizes database load)
+# - CheckM1: SMALL batches strongly recommended. pplacer is single-threaded
+#   per batch; many small batches run concurrently via Snakemake.
+# - CheckM2: moderate batches work well (neural-net prediction is fast)
+# - GTDB-Tk: larger batches amortize the ~85 GB database load
 checkm1_batch_size: null
 checkm2_batch_size: null
 gtdbtk_batch_size: null

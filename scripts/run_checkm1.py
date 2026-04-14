@@ -95,6 +95,7 @@ def run_checkm1(
     input_dir: str, output_dir: str, output_tsv: str,
     threads: int = 16, db_path: str | None = None,
     extension: str | None = None,
+    pplacer_threads: int | None = None,
 ) -> None:
     """Run CheckM1 lineage_wf on a directory of genomes.
 
@@ -115,11 +116,19 @@ def run_checkm1(
                 f"No FASTA files with extension .fna/.fasta/.fa found in {input_dir}"
             )
 
+    # pplacer's multi-threading doesn't scale well beyond ~4 threads
+    # (lock contention on the reference tree, deadlocks on macOS/ARM at
+    # high counts). Keep --threads high for prodigal/hmmsearch, but cap
+    # pplacer_threads separately.
+    if pplacer_threads is None:
+        pplacer_threads = min(4, threads)
+
     base_cmd = [
         "checkm", "lineage_wf",
         "--tab_table",
         "-f", str(summary),
         "--threads", str(threads),
+        "--pplacer_threads", str(pplacer_threads),
         "--extension", extension,
         input_dir,
         output_dir,
@@ -154,4 +163,5 @@ if __name__ == "__main__":
         output_tsv=sys.argv[3],
         threads=int(sys.argv[4]),
         db_path=sys.argv[5] if len(sys.argv) > 5 else None,
+        pplacer_threads=int(sys.argv[6]) if len(sys.argv) > 6 else None,
     )

@@ -43,6 +43,18 @@ set-resources:
     runtime: 5
     mem_mb: 4000
 
+  # CheckM1: pplacer memory scales linearly with --pplacer_threads
+  # (~4 GB per thread). On a 64-core/512 GB node: 64 * 4 = 256 GB.
+  checkm1_setup_batch:
+    runtime: 10
+    mem_mb: 2000
+  checkm1_batch:
+    runtime: 360           # pplacer is the bottleneck even multi-threaded
+    mem_mb: 300000         # 300 GB covers 64 pplacer threads + overhead
+  checkm1_merge:
+    runtime: 10
+    mem_mb: 4000
+
   checkm2_setup_batch:
     runtime: 10
     mem_mb: 2000

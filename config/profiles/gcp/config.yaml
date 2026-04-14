@@ -55,6 +55,15 @@ set-resources:
     googlebatch_memory: 2000
     runtime: 10
 
+  # CheckM1: pplacer memory ~4 GB per thread. n2-highmem-16 gives 128 GB for
+  # 16 pplacer threads. Preemptible OK — CheckM1 batches are restartable.
+  checkm1_batch:
+    googlebatch_machine_type: n2-highmem-16
+    googlebatch_cpu_milli: 16000
+    googlebatch_memory: 128000
+    googlebatch_preemptible: true
+    runtime: 360
+
   # CheckM2: diamond + neural net. n2-standard-16 fits 8 threads comfortably.
   # Use preemptible VMs for 60-80% cost savings — jobs will auto-retry on preemption.
   checkm2_batch:

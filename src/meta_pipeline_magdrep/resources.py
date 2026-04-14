@@ -214,28 +214,26 @@ def allocate_threads(
 ) -> dict[str, int]:
     """Allocate threads to each tool for local execution.
 
-    CheckM1's pplacer step is the bottleneck: single-threaded per genome,
-    parallelized across genomes by `--threads`. It benefits most from
-    high concurrency. Strategy:
+    CheckM1's pplacer step supports --pplacer_threads for multi-threaded
+    placement. Give CheckM1 ALL CPUs so pplacer runs at max parallelism.
+    Snakemake's scheduler blocks CheckM2/GTDB-Tk until CheckM1 finishes
+    and releases threads; then they run concurrently (half cores each).
 
-    - **CheckM1 gets ALL CPUs.** It runs first (longest), and Snakemake's
-      scheduler won't start CheckM2/GTDB-Tk until CheckM1 releases threads.
-    - **CheckM2 + GTDB-Tk split remaining cores** and run concurrently
-      after CheckM1 finishes.
+    Note: pplacer memory scales linearly with --pplacer_threads (~4 GB
+    per thread for CheckM1's tree). On 128 GB RAM, 16 threads ≈ 64 GB
+    is fine.
 
     On SLURM/GCP each tool gets its own node, so this only matters for
     local execution.
 
     Returns {"checkm1": N, "checkm2": N, "gtdbtk": N}.
     """
-    checkm2_and_gtdbtk = {"checkm2", "gtdbtk"} & active_steps
-    n_concurrent_after_ck1 = len(checkm2_and_gtdbtk)
-
-    # CheckM1 always claims all cores (pplacer bottleneck)
+    # CheckM1 claims all cores — pplacer_threads scales placement speed
     checkm1_threads = cpu_count
 
-    # CheckM2 + GTDB-Tk split cores between them (they run after CheckM1)
-    if n_concurrent_after_ck1 >= 2:
+    # CheckM2 + GTDB-Tk split the remaining cores
+    checkm2_and_gtdbtk = {"checkm2", "gtdbtk"} & active_steps
+    if len(checkm2_and_gtdbtk) >= 2:
         usable = max(2, cpu_count)
         half = max(1, usable // 2)
         checkm2_threads = half
