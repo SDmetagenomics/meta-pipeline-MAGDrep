@@ -13,7 +13,7 @@ channels:
 dependencies:
   - python=3.11
   - checkm-genome=1.2.5
-  - pplacer=1.1.alpha22
-  - hmmer=3.4
-  - prodigal=2.6.3
+  - pplacer
+  - hmmer
+  - prodigal
   - pysam

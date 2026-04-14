@@ -210,25 +210,42 @@ def compute_gtdbtk_pplacer_cpus(
 
 
 def allocate_threads(
-    cpu_count: int, concurrent_steps: int,
+    cpu_count: int, active_steps: set[str],
 ) -> dict[str, int]:
-    """Split CPU budget across concurrent pipeline steps.
+    """Allocate threads to each tool for local execution.
 
-    With 1 active step, it claims all CPUs. With 2 or 3 active, divides
-    roughly evenly (GTDB-Tk gets any remainder — classify_wf parallelizes
-    the most cleanly).
+    CheckM1's pplacer step is the bottleneck: single-threaded per genome,
+    parallelized across genomes by `--threads`. It benefits most from
+    high concurrency. Strategy:
+
+    - **CheckM1 gets ALL CPUs.** It runs first (longest), and Snakemake's
+      scheduler won't start CheckM2/GTDB-Tk until CheckM1 releases threads.
+    - **CheckM2 + GTDB-Tk split remaining cores** and run concurrently
+      after CheckM1 finishes.
+
+    On SLURM/GCP each tool gets its own node, so this only matters for
+    local execution.
 
     Returns {"checkm1": N, "checkm2": N, "gtdbtk": N}.
     """
-    if concurrent_steps <= 1:
-        return {"checkm1": cpu_count, "checkm2": cpu_count, "gtdbtk": cpu_count}
+    checkm2_and_gtdbtk = {"checkm2", "gtdbtk"} & active_steps
+    n_concurrent_after_ck1 = len(checkm2_and_gtdbtk)
 
-    usable = max(2, cpu_count)
-    share = max(1, usable // max(concurrent_steps, 2))
-    # GTDB-Tk gets any leftover cores
-    remainder = max(1, usable - share * (concurrent_steps - 1))
+    # CheckM1 always claims all cores (pplacer bottleneck)
+    checkm1_threads = cpu_count
+
+    # CheckM2 + GTDB-Tk split cores between them (they run after CheckM1)
+    if n_concurrent_after_ck1 >= 2:
+        usable = max(2, cpu_count)
+        half = max(1, usable // 2)
+        checkm2_threads = half
+        gtdbtk_threads = usable - half
+    else:
+        checkm2_threads = cpu_count
+        gtdbtk_threads = cpu_count
+
     return {
-        "checkm1": share,
-        "checkm2": share,
-        "gtdbtk": remainder,
+        "checkm1": checkm1_threads,
+        "checkm2": checkm2_threads,
+        "gtdbtk": gtdbtk_threads,
     }

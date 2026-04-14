@@ -178,35 +178,28 @@ def run(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
 
     cfg.setdefault("gtdbtk", {})
 
-    # When rules run on the same partition (same node pool), they contend
-    # for CPUs, so split allocations. When on different partitions, each
-    # rule gets its full partition's CPU budget.
-    # checkm1 and checkm2 both stay on the standard partition; gtdbtk may
-    # route to a memory partition (distinct_memory=True).
-    active_standard = {"checkm1", "checkm2"} & set(cfg["steps"])
-    gtdbtk_active = "gtdbtk" in cfg["steps"]
-    concurrent = len(active_standard) + (1 if gtdbtk_active and not distinct_memory else 0)
+    active_steps = set(cfg["steps"])
+    active_standard = {"checkm1", "checkm2"} & active_steps
 
-    if concurrent > 1 and not distinct_memory:
-        threads_alloc = allocate_threads(std_cpus, concurrent)
+    if distinct_memory:
+        # GTDB-Tk on a separate memory partition — no contention with checkm*.
+        # CheckM1 gets the full standard node (pplacer bottleneck); after it
+        # finishes, checkm2 inherits those cores.
+        threads_alloc = allocate_threads(std_cpus, active_standard | {"gtdbtk"})
+        checkm1_threads = threads_alloc["checkm1"]
+        checkm2_threads = threads_alloc["checkm2"]
+        gtdbtk_threads = mem_cpus  # full memory node
+        pplacer_reserve = SYSTEM_OVERHEAD_GB
+    else:
+        # Same partition for everything. CheckM1 claims all cores (runs first
+        # via Snakemake scheduler — nothing else can start until it releases
+        # threads). CheckM2 + GTDB-Tk run concurrently after.
+        threads_alloc = allocate_threads(std_cpus, active_steps)
         checkm1_threads = threads_alloc["checkm1"]
         checkm2_threads = threads_alloc["checkm2"]
         gtdbtk_threads = threads_alloc["gtdbtk"]
-        # Reserve memory for concurrent CheckM batches on same node
-        pplacer_reserve = SYSTEM_OVERHEAD_GB + CHECKM2_CONCURRENT_MEM_GB * len(active_standard)
-    else:
-        # When checkm1 + checkm2 both run on the standard partition alongside
-        # GTDB-Tk on a separate memory partition, checkm1 and checkm2 still
-        # contend with each other — split the standard partition between them.
-        if distinct_memory and len(active_standard) > 1:
-            ck_share = max(1, std_cpus // len(active_standard))
-            checkm1_threads = ck_share
-            checkm2_threads = ck_share
-        else:
-            checkm1_threads = std_cpus
-            checkm2_threads = std_cpus
-        gtdbtk_threads = mem_cpus
-        pplacer_reserve = SYSTEM_OVERHEAD_GB
+        # Reserve memory for a concurrent CheckM2 batch when it runs alongside GTDB-Tk
+        pplacer_reserve = SYSTEM_OVERHEAD_GB + CHECKM2_CONCURRENT_MEM_GB
 
     if cfg.get("checkm1_threads", "auto") == "auto":
         cfg["checkm1_threads"] = checkm1_threads
