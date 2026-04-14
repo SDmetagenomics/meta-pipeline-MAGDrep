@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from meta_pipeline_magdrep.inputs import (
-    build_mag_path_map, mag_id_from_path,
+    build_mag_path_map, mag_id_from_path, collect_all_fasta_paths,
 )
 
 
@@ -30,48 +30,70 @@ def test_directory_input(tmp_path):
     assert result["MAG_A"].name == "MAG_A.fna"
 
 
-def test_path_list_file(tmp_path):
-    """List-file mode: read paths from a text file."""
-    dir1 = tmp_path / "lab1"
-    dir2 = tmp_path / "lab2"
+def test_path_list_file_with_directories(tmp_path):
+    """List-file mode: each line is a directory, every FASTA in it is a MAG."""
+    dir1 = tmp_path / "sample_1_bins"
+    dir2 = tmp_path / "sample_2_bins"
     dir1.mkdir()
     dir2.mkdir()
-    f1 = _make_fasta(dir1, "M1.fna")
-    f2 = _make_fasta(dir2, "M2.fasta")
+    _make_fasta(dir1, "bin.001.fna")
+    _make_fasta(dir1, "bin.002.fna")
+    _make_fasta(dir2, "bin.042.fasta")
 
-    listfile = tmp_path / "mags.txt"
-    listfile.write_text(f"# header comment\n{f1}\n\n{f2}\n# trailing comment\n")
+    listfile = tmp_path / "mag_dirs.txt"
+    listfile.write_text(f"# header comment\n{dir1}\n\n{dir2}\n# trailing comment\n")
 
     result = build_mag_path_map(listfile)
-    assert set(result.keys()) == {"M1", "M2"}
-    assert result["M1"] == f1.resolve()
-    assert result["M2"] == f2.resolve()
+    assert set(result.keys()) == {"bin.001", "bin.002", "bin.042"}
 
 
-def test_path_list_relative_paths(tmp_path):
-    """Relative paths in a list file resolve against the file's directory."""
+def test_path_list_relative_directory(tmp_path):
+    """Relative directory paths resolve against the list file's location."""
     sub = tmp_path / "genomes"
     sub.mkdir()
-    f = _make_fasta(sub, "X.fna")
+    _make_fasta(sub, "X.fna")
 
     listfile = tmp_path / "list.txt"
-    listfile.write_text("genomes/X.fna\n")
+    listfile.write_text("genomes\n")
 
     result = build_mag_path_map(listfile)
-    assert result["X"] == f.resolve()
+    assert "X" in result
 
 
-def test_path_list_missing_file_raises(tmp_path):
-    """Bad paths in a list file should fail loud, not silently skip."""
+def test_path_list_missing_directory_raises(tmp_path):
+    """Bad directory paths in a list file should fail loud."""
     listfile = tmp_path / "bad.txt"
-    listfile.write_text(f"{tmp_path}/does_not_exist.fna\n")
+    listfile.write_text(f"{tmp_path}/does_not_exist\n")
 
-    with pytest.raises(ValueError, match="does not exist"):
+    with pytest.raises(ValueError, match="directory does not exist"):
+        build_mag_path_map(listfile)
+
+
+def test_path_list_rejects_fasta_path_as_line(tmp_path):
+    """A line pointing at a file (not a directory) should raise — directories only."""
+    d = tmp_path / "bins"
+    d.mkdir()
+    f = _make_fasta(d, "bin.fna")
+
+    listfile = tmp_path / "wrong.txt"
+    listfile.write_text(f"{f}\n")
+
+    with pytest.raises(ValueError, match="expected a directory of FASTA files"):
+        build_mag_path_map(listfile)
+
+
+def test_path_list_empty_directory_raises(tmp_path):
+    """A directory with no FASTAs inside should raise a clear error."""
+    empty = tmp_path / "empty_bins"
+    empty.mkdir()
+    listfile = tmp_path / "list.txt"
+    listfile.write_text(f"{empty}\n")
+    with pytest.raises(ValueError, match="no FASTA files found"):
         build_mag_path_map(listfile)
 
 
 def test_duplicate_mag_id_raises(tmp_path):
-    """Two FASTAs with the same stem should raise."""
+    """Two FASTAs with the same stem across directories should raise."""
     a_dir = tmp_path / "a"
     b_dir = tmp_path / "b"
     a_dir.mkdir()
@@ -80,10 +102,41 @@ def test_duplicate_mag_id_raises(tmp_path):
     _make_fasta(b_dir, "MAG_X.fasta")
 
     listfile = tmp_path / "dups.txt"
-    listfile.write_text(f"{a_dir}/MAG_X.fna\n{b_dir}/MAG_X.fasta\n")
+    listfile.write_text(f"{a_dir}\n{b_dir}\n")
 
     with pytest.raises(ValueError, match="Duplicate MAG ID"):
         build_mag_path_map(listfile)
+
+
+def test_duplicate_allowed_when_flag_set(tmp_path):
+    """allow_duplicates=True lets collisions through (caller disambiguates)."""
+    a_dir = tmp_path / "a"
+    b_dir = tmp_path / "b"
+    a_dir.mkdir()
+    b_dir.mkdir()
+    _make_fasta(a_dir, "MAG_X.fna")
+    _make_fasta(b_dir, "MAG_X.fasta")
+
+    listfile = tmp_path / "dups.txt"
+    listfile.write_text(f"{a_dir}\n{b_dir}\n")
+
+    # Should NOT raise
+    result = build_mag_path_map(listfile, allow_duplicates=True)
+    assert "MAG_X" in result
+
+
+def test_collect_all_fasta_paths_returns_duplicates(tmp_path):
+    """collect_all_fasta_paths returns the raw list including dup stems."""
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    _make_fasta(a, "X.fna")
+    _make_fasta(b, "X.fna")
+    listfile = tmp_path / "list.txt"
+    listfile.write_text(f"{a}\n{b}\n")
+    all_paths = collect_all_fasta_paths(listfile)
+    assert len(all_paths) == 2
 
 
 def test_invalid_input_path_raises(tmp_path):
@@ -93,13 +146,15 @@ def test_invalid_input_path_raises(tmp_path):
 
 
 def test_path_list_with_tilde_expansion(tmp_path, monkeypatch):
-    """Paths starting with ~ should expand to home directory."""
+    """Directory paths starting with ~ should expand to home directory."""
     # Set HOME to tmp_path so ~ expands there
     monkeypatch.setenv("HOME", str(tmp_path))
-    f = _make_fasta(tmp_path, "Home.fna")
+    sub = tmp_path / "bins"
+    sub.mkdir()
+    _make_fasta(sub, "Home.fna")
 
     listfile = tmp_path / "list.txt"
-    listfile.write_text("~/Home.fna\n")
+    listfile.write_text("~/bins\n")
 
     result = build_mag_path_map(listfile)
     assert "Home" in result

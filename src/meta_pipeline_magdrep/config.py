@@ -15,22 +15,82 @@ _DEFAULT_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
 DB_DIR_ENV_VAR = "MAGDREP_DB_DIR"
 
 
-def resolve_db_dir(explicit: str | Path | None = None) -> Path:
-    """Resolve the database directory with clear priority.
+def _persistent_config_paths() -> list[Path]:
+    """Locations (highest-priority first) where persistent db config can live.
 
-    1. Explicit argument (typically from --db-dir flag or config file)
-    2. MAGDREP_DB_DIR environment variable
-    3. Project-local "databases/" directory (default)
+    Conda-env scoped first — a lab admin running `db update --db-dir X` once
+    configures the location for everyone else sharing that env. Falls back
+    to a user-scoped config in XDG_CONFIG_HOME.
+    """
+    paths: list[Path] = []
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        paths.append(Path(conda_prefix) / "etc" / "meta-pipeline-MAGDrep" / "db_config.yaml")
+    xdg = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    paths.append(Path(xdg) / "meta-pipeline-MAGDrep" / "db_config.yaml")
+    return paths
+
+
+def _read_persistent_db_config() -> tuple[Path | None, Path | None]:
+    """Return (db_dir, source_file) for the first readable persistent config,
+    or (None, None) if no config is found."""
+    for path in _persistent_config_paths():
+        if path.exists():
+            try:
+                with open(path) as f:
+                    data = yaml.safe_load(f) or {}
+                db_dir = data.get("db_dir")
+                if db_dir:
+                    return Path(db_dir).expanduser(), path
+            except (OSError, yaml.YAMLError):
+                continue
+    return None, None
+
+
+def write_persistent_db_config(db_dir: str | Path) -> Path:
+    """Persist the chosen db_dir so future invocations (same env) find it.
+
+    Writes to the first location in `_persistent_config_paths()` that we
+    can write to — conda-env-scoped if available, user-scoped otherwise.
+    Returns the path written.
+    """
+    last_err: Exception | None = None
+    for path in _persistent_config_paths():
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w") as f:
+                yaml.safe_dump({"db_dir": str(Path(db_dir).resolve())}, f)
+            return path
+        except OSError as err:
+            last_err = err
+            continue
+    raise OSError(f"Could not write persistent db config: {last_err}")
+
+
+def resolve_db_dir(
+    explicit: str | Path | None = None,
+) -> tuple[Path, str]:
+    """Resolve the database directory and report where the value came from.
+
+    Priority:
+      1. Explicit argument (--db-dir flag or config file)
+      2. $MAGDREP_DB_DIR environment variable
+      3. Persistent config (conda env first, then user XDG config)
+      4. Project-local "databases/" directory
     """
     if explicit:
         p = Path(explicit)
-        return p if p.is_absolute() else _PROJECT_ROOT / p
+        return (p if p.is_absolute() else _PROJECT_ROOT / p), "explicit"
 
     env_val = os.environ.get(DB_DIR_ENV_VAR)
     if env_val:
-        return Path(env_val).expanduser()
+        return Path(env_val).expanduser(), f"${DB_DIR_ENV_VAR}"
 
-    return _PROJECT_ROOT / "databases"
+    persisted, source = _read_persistent_db_config()
+    if persisted:
+        return persisted, f"persistent config ({source})"
+
+    return _PROJECT_ROOT / "databases", "project default"
 
 
 class ConfigError(ValueError):
@@ -96,7 +156,7 @@ def load_and_merge_config(
     # Treat the literal shipped default as "not explicit" so the env var wins
     if explicit == "databases":
         explicit = None
-    db_dir = resolve_db_dir(explicit)
+    db_dir, _source = resolve_db_dir(explicit)
     cfg["db_dir"] = str(db_dir)
 
     # Resolve per-tool database paths: if null, default to db_dir/<tool>

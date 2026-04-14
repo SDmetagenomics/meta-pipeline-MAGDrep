@@ -47,6 +47,7 @@ rule dereplicate_cluster:
             "--output-derep-report", output.derep_report,
             "--ani-threshold", str(float(cfg.get("ani_threshold", 95.0))),
             "--min-af", str(float(cfg.get("min_af", 10.0))),
+            "--min-completeness", str(float(cfg.get("min_completeness", 60.0))),
             "--score-weights", json.dumps(weights),
         ]
         subprocess.run(cmd, check=True)

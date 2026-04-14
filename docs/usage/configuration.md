@@ -68,5 +68,5 @@ dereplicate:
 ```
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --config my_config.yaml
+meta-pipeline-MAGDrep run -i mags/ -o results/ --config my_config.yaml
 ```

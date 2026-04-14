@@ -28,23 +28,23 @@ meta-pipeline-MAGDrep db update --db-dir /data/magdrep_dbs
 ## 3. Run the Pipeline
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/
+meta-pipeline-MAGDrep run -i mags/ -o results/
 ```
 
 ### Common Options
 
 ```bash
 # Dry run -- show the job DAG without executing
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --dry-run
+meta-pipeline-MAGDrep run -i mags/ -o results/ --dry-run
 
 # Run only genome stats and CheckM2
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --steps genome_stats,checkm2
+meta-pipeline-MAGDrep run -i mags/ -o results/ --steps genome_stats,checkm2
 
 # Skip taxonomy (saves time if GTDB-Tk DB is not available)
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk
+meta-pipeline-MAGDrep run -i mags/ -o results/ --skip gtdbtk
 
 # Use a custom config file
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --config my_config.yaml
+meta-pipeline-MAGDrep run -i mags/ -o results/ --config my_config.yaml
 ```
 
 ## 4. Inspect Results

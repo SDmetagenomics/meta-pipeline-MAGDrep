@@ -78,11 +78,21 @@ quality_filter:
 # Dereplication settings (skani-based species clustering)
 # Connected components are detected at 90% ANI, then average-linkage
 # clustering is performed independently within each component.
+# min_completeness: only genomes above this threshold enter the final
+#   representative-selection step (skani still computes ANI on everything).
+# Composite score for representative selection:
+#   A*Completeness - B*Contamination
+#   + C*(Contamination * strain_heterogeneity/100)
+#   + D*log10(N50) + E*log10(genome_size)
+# Note: CheckM2 doesn't output strain_heterogeneity, so the C term
+# is effectively zero unless external data is merged in.
 dereplicate:
   ani_threshold: 95.0
   min_af: 10.0
+  min_completeness: 60.0
   score_weights:
-    w_qscore: 1.0
-    w_completeness: 1.0
-    w_n50: 0.5
-    w_contam: 0.5
+    A: 1.0    # completeness weight
+    B: 5.0    # contamination weight
+    C: 1.0    # strain-heterogeneity × contamination weight
+    D: 0.5    # log10(N50) weight
+    E: 0.0    # log10(genome_size) weight

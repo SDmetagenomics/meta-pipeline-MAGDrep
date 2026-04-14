@@ -79,20 +79,47 @@ def test_load_and_merge_config_returns_validated():
 def test_resolve_db_dir_explicit_wins(monkeypatch):
     """Explicit path beats env var beats default."""
     monkeypatch.setenv(DB_DIR_ENV_VAR, "/tmp/from-env")
-    assert str(resolve_db_dir("/tmp/from-arg")) == "/tmp/from-arg"
+    path, source = resolve_db_dir("/tmp/from-arg")
+    assert str(path) == "/tmp/from-arg"
+    assert source == "explicit"
 
 
-def test_resolve_db_dir_env_var(monkeypatch):
-    """Env var is used when no explicit path is given."""
+def test_resolve_db_dir_env_var(monkeypatch, tmp_path):
+    """Env var is used when no explicit path is given (and no persistent cfg)."""
     monkeypatch.setenv(DB_DIR_ENV_VAR, "/tmp/shared-db-location")
-    assert str(resolve_db_dir()) == "/tmp/shared-db-location"
+    # Isolate from any real user/conda persistent config
+    monkeypatch.delenv("CONDA_PREFIX", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    path, source = resolve_db_dir()
+    assert str(path) == "/tmp/shared-db-location"
+    assert source.startswith("$")
 
 
-def test_resolve_db_dir_default(monkeypatch):
+def test_resolve_db_dir_default(monkeypatch, tmp_path):
     """Falls back to project-relative databases/ when nothing else is set."""
     monkeypatch.delenv(DB_DIR_ENV_VAR, raising=False)
-    result = resolve_db_dir()
-    assert str(result).endswith("databases")
+    monkeypatch.delenv("CONDA_PREFIX", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    path, source = resolve_db_dir()
+    assert str(path).endswith("databases")
+    assert source == "project default"
+
+
+def test_resolve_db_dir_from_persistent_config(monkeypatch, tmp_path):
+    """Persistent config takes precedence over the project default but
+    is overridden by env var / explicit arg."""
+    from pathlib import Path as _P
+    from meta_pipeline_magdrep.config import write_persistent_db_config
+    monkeypatch.delenv(DB_DIR_ENV_VAR, raising=False)
+    monkeypatch.delenv("CONDA_PREFIX", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    target = tmp_path / "lab-shared-dbs"
+    target.mkdir()
+    write_persistent_db_config(target)
+    path, source = resolve_db_dir()
+    # write_persistent_db_config stores the resolved absolute path
+    assert path == _P(target).resolve()
+    assert "persistent" in source
 
 
 def test_load_and_merge_config_honors_env_var(monkeypatch):

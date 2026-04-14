@@ -17,7 +17,7 @@ Snakemake rule as a separate SLURM job via `snakemake-executor-plugin-slurm`.
 conda activate magdrep
 
 # Run, tuning batch sizes to your cluster's sweet spot
-meta-pipeline-MAGDrep qc \
+meta-pipeline-MAGDrep run \
     -i mags/ \
     -o results/ \
     --profile slurm \
@@ -36,11 +36,11 @@ meta-pipeline-MAGDrep qc \
 
 ## Heterogeneous clusters (standard + memory partitions)
 
-Many clusters reserve high-memory nodes on a separate partition. MAGDrep
+Many clusters reserve memory nodes on a separate partition. MAGDrep
 routes GTDB-Tk to the memory partition and sizes it to those larger nodes:
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
+meta-pipeline-MAGDrep run -i mags/ -o results/ --profile slurm \
     --slurm-standard-partition standard \
     --slurm-memory-partition memory \
     --cluster-cpus 64 --cluster-mem-gb 256 \
@@ -69,7 +69,7 @@ Instead it determines per-job sizing from (in order):
 Example:
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
+meta-pipeline-MAGDrep run -i mags/ -o results/ --profile slurm \
     --cluster-cpus 64 --cluster-mem-gb 512 \
     --config checkm2_batch_size=200 gtdbtk_batch_size=1000
 ```

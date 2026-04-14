@@ -10,7 +10,7 @@
 # computed value. Memory and runtime are still profile-controlled.
 #
 # Usage:
-#   meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
+#   meta-pipeline-MAGDrep run -i mags/ -o results/ --profile slurm \
 #     --config checkm2_batch_size=200 gtdbtk_batch_size=1000
 #
 # Tips:

@@ -6,7 +6,7 @@ import click
 from meta_pipeline_magdrep import __version__
 from meta_pipeline_magdrep.config import (
     load_and_merge_config, VALID_STEPS, ConfigError,
-    resolve_db_dir, DB_DIR_ENV_VAR,
+    resolve_db_dir, write_persistent_db_config, DB_DIR_ENV_VAR,
 )
 from meta_pipeline_magdrep.resources import (
     detect_resources,
@@ -37,7 +37,7 @@ def main():
     pass
 
 
-@main.command()
+@main.command(name="run")
 @click.option("--input", "-i", "input_dir", required=True,
               type=click.Path(exists=True, path_type=Path),
               help="Directory of input MAG FASTA files OR a text file with "
@@ -74,12 +74,16 @@ def main():
 @click.option("--slurm-standard-partition", default="normal", show_default=True,
               help="SLURM partition for CheckM2 and most rules.")
 @click.option("--slurm-memory-partition", default=None,
-              help="SLURM partition for GTDB-Tk (high-memory). "
+              help="SLURM partition for GTDB-Tk (memory). "
                    "Defaults to --slurm-standard-partition if not set.")
-def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
-       cluster_cpus, cluster_mem_gb, cluster_mem_node_cpus, cluster_mem_node_mem_gb,
-       slurm_standard_partition, slurm_memory_partition):
-    """Run quality assessment on a directory of MAG FASTA files."""
+@click.option("--rename", is_flag=True, default=False,
+              help="Resolve duplicate genome IDs (append _A,_B,…) and "
+                   "rewrite every contig header to {genome}_scaffold_{N}. "
+                   "Without this flag, duplicates raise a loud error.")
+def run(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
+        cluster_cpus, cluster_mem_gb, cluster_mem_node_cpus, cluster_mem_node_mem_gb,
+        slurm_standard_partition, slurm_memory_partition, rename):
+    """Run the pipeline on a directory or path-list of MAGs."""
     overrides = {"outdir": str(output_dir)}
     if jobs:
         overrides["max_parallel_jobs"] = jobs
@@ -114,6 +118,30 @@ def qc(input_dir, output_dir, profile, steps, skip, config_file, dry_run, jobs,
         active_steps -= to_skip
 
     cfg["steps"] = sorted(active_steps)
+
+    # Validate and (optionally) rename inputs into a flat staging directory.
+    # Downstream Snakemake rules always see this staging dir, regardless of
+    # whether the user passed a directory or a path-list file.
+    from meta_pipeline_magdrep.rename import (
+        stage_normalized_inputs, InputValidationError,
+    )
+    staging_dir = Path(output_dir) / "input_genomes"
+    try:
+        staging_dir, id_map = stage_normalized_inputs(
+            input_dir, staging_dir, rename=rename,
+        )
+    except InputValidationError as exc:
+        click.echo(f"\nError validating input genomes:\n{exc}", err=True)
+        sys.exit(1)
+    except ValueError as exc:
+        click.echo(f"Error resolving input: {exc}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Found {len(id_map)} genome(s) from {input_dir}")
+    if rename:
+        click.echo(f"  (normalized copies written to {staging_dir}/)")
+    # Swap the input passed to Snakemake to the staging directory
+    input_dir = staging_dir
 
     # Detect login-machine resources (always — used for local execution
     # and for selecting sensible defaults).
@@ -223,18 +251,25 @@ def db():
 @click.option("--db-dir", default=None,
               type=click.Path(path_type=Path),
               help=f"Directory to download databases into. "
-                   f"Defaults to ${DB_DIR_ENV_VAR} env var or ./databases/.")
+                   f"If given, the path is saved to a per-environment config "
+                   f"so future commands find it automatically (unless --no-save "
+                   f"is used). Defaults to ${DB_DIR_ENV_VAR} env var or "
+                   f"persistent config or ./databases/.")
 @click.option("--only", default=None,
               help="Download only this database (checkm2 or gtdbtk).")
 @click.option("--force", is_flag=True, default=False,
               help="Re-download even if already present.")
-def db_update(db_dir, only, force):
+@click.option("--save/--no-save", default=True,
+              help="Save the resolved --db-dir to a per-env config so every "
+                   "command finds it automatically (default: save).")
+def db_update(db_dir, only, force, save):
     """Download required databases (CheckM2, GTDB-Tk)."""
     _ensure_databases_on_path()
     from databases.download import download_all_databases, _DOWNLOADERS, DATABASES
 
-    db_path = resolve_db_dir(db_dir)
-    click.echo(f"Database directory: {db_path}\n")
+    db_path, source = resolve_db_dir(db_dir)
+    click.echo(f"Database directory: {db_path}")
+    click.echo(f"  (source: {source})\n")
 
     if only:
         if only not in _DOWNLOADERS:
@@ -247,30 +282,52 @@ def db_update(db_dir, only, force):
         click.echo("Downloading all databases...")
         download_all_databases(db_path, force=force)
 
-    click.echo("\nDone. Run 'meta-pipeline-MAGDrep db status' to verify.")
+    # If the user passed --db-dir explicitly, remember it for next time.
+    if db_dir is not None and save:
+        try:
+            written = write_persistent_db_config(db_path)
+            click.echo(f"\nSaved db_dir to {written}")
+            click.echo("Future `meta-pipeline-MAGDrep` invocations will find these databases automatically.")
+        except OSError as exc:
+            click.echo(f"\nWarning: could not save persistent config ({exc}).")
+            click.echo(f"Set ${DB_DIR_ENV_VAR}={db_path} in your shell profile to persist.")
+
+    click.echo("\nRun 'meta-pipeline-MAGDrep db status' to verify.")
 
 
 @db.command("status")
 @click.option("--db-dir", default=None,
               type=click.Path(path_type=Path),
               help=f"Database directory to inspect. "
-                   f"Defaults to ${DB_DIR_ENV_VAR} env var or ./databases/.")
+                   f"Defaults to ${DB_DIR_ENV_VAR} env var, then persistent "
+                   f"config, then ./databases/.")
 def db_status(db_dir):
-    """Show installed database versions."""
+    """Show installed database versions and where MAGDrep is looking."""
     _ensure_databases_on_path()
     from databases.download import database_status
 
-    db_path = resolve_db_dir(db_dir)
+    db_path, source = resolve_db_dir(db_dir)
     click.echo(f"Database directory: {db_path}")
-    env_val = os.environ.get(DB_DIR_ENV_VAR)
-    if db_dir is None and env_val:
-        click.echo(f"  (source: ${DB_DIR_ENV_VAR})")
-    click.echo("")
+    click.echo(f"  (source: {source})\n")
+
+    # If the directory doesn't exist at all, guide the user to `db update`.
+    if not db_path.exists():
+        click.echo("Databases not found, please run `meta-pipeline-MAGDrep db update`.")
+        click.echo(f"Or: meta-pipeline-MAGDrep db update --db-dir <your-preferred-location>")
+        sys.exit(1)
 
     status = database_status(db_path)
+    # Load pinned versions from the packaged config.yaml for display
+    try:
+        cfg = load_and_merge_config()
+        versions = cfg.get("db_versions", {})
+    except Exception:
+        versions = {}
+
     for name, info in status.items():
         icon = "OK" if info["present"] else "MISSING"
-        click.echo(f"  [{icon:>7}]  {info['display_name']:<20}  {info['size_hint']}")
+        version = versions.get(name, "?")
+        click.echo(f"  [{icon:>7}]  {info['display_name']:<20}  version: {version:<10}  {info['size_hint']}")
         if not info["present"] and info["directory_exists"]:
             click.echo(f"           Directory exists but download incomplete — run db update --only {name}")
 

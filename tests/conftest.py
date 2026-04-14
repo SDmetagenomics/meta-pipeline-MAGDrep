@@ -47,10 +47,11 @@ def default_config():
             "ani_threshold": 95.0,
             "min_af": 10.0,
             "score_weights": {
-                "w_qscore": 1.0,
-                "w_completeness": 1.0,
-                "w_n50": 0.5,
-                "w_contam": 0.5,
+                "A": 1.0,
+                "B": 5.0,
+                "C": 1.0,
+                "D": 0.5,
+                "E": 0.0,
             },
         },
     }

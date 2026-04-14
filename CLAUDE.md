@@ -60,10 +60,10 @@ meta-pipeline-MAGDrep db update
 meta-pipeline-MAGDrep db status
 
 # Run full pipeline on test genomes
-meta-pipeline-MAGDrep qc -i tests/data/genomes/ -o results/
+meta-pipeline-MAGDrep run -i tests/data/genomes/ -o results/
 
 # Skip a step
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk
+meta-pipeline-MAGDrep run -i mags/ -o results/ --skip gtdbtk
 
 # View timing
 meta-pipeline-MAGDrep benchmark results/

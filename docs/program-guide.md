@@ -49,7 +49,7 @@ laptop, a SLURM cluster, and a cloud VM pool.
   `environment.yml`, conda-lock.txt generated at build time, database
   versions declared in config.
 - **Sensible defaults, accessible knobs.** A fresh user runs
-  `make install && meta-pipeline-MAGDrep qc -i mags/ -o results/`. An
+  `make install && meta-pipeline-MAGDrep run -i mags/ -o results/`. An
   expert tunes every threshold, thread count, and batch size.
 - **Resource awareness.** The pipeline detects CPUs and memory, splits
   work so CheckM2 and GTDB-Tk run concurrently when possible, and sizes
@@ -177,7 +177,7 @@ automatically:
 ```bash
 meta-pipeline-MAGDrep db update      # downloads to $MAGDREP_DB_DIR
 meta-pipeline-MAGDrep db status      # checks $MAGDREP_DB_DIR
-meta-pipeline-MAGDrep qc -i mags/ -o results/   # reads from $MAGDREP_DB_DIR
+meta-pipeline-MAGDrep run -i mags/ -o results/   # reads from $MAGDREP_DB_DIR
 ```
 
 Resolution priority: `--db-dir` flag (per-command) > `$MAGDREP_DB_DIR`
@@ -406,13 +406,13 @@ dereplicate:
 Default is all four. Skip one:
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk
+meta-pipeline-MAGDrep run -i mags/ -o results/ --skip gtdbtk
 ```
 
 Run only specific ones:
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --steps genome_stats,checkm2
+meta-pipeline-MAGDrep run -i mags/ -o results/ --steps genome_stats,checkm2
 ```
 
 ---
@@ -519,7 +519,7 @@ on shared-filesystem clusters.
 ### Use case 1 — "I have 200 MAGs from a single metagenome"
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/
+meta-pipeline-MAGDrep run -i mags/ -o results/
 meta-pipeline-MAGDrep benchmark results/
 ```
 
@@ -530,7 +530,7 @@ species-level catalog.
 ### Use case 2 — "I have 10,000 MAGs and access to SLURM"
 
 ```bash
-meta-pipeline-MAGDrep qc -i /scratch/mags/ -o /scratch/results/ \
+meta-pipeline-MAGDrep run -i /scratch/mags/ -o /scratch/results/ \
     --profile slurm \
     --slurm-standard-partition standard \
     --slurm-memory-partition memory \
@@ -542,7 +542,7 @@ See [docs/deployment/slurm.md](deployment/slurm.md) for profile tuning.
 ### Use case 3 — "Quality control only, no taxonomy"
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk --skip dereplicate
+meta-pipeline-MAGDrep run -i mags/ -o results/ --skip gtdbtk --skip dereplicate
 ```
 
 Skips the two expensive steps. Produces `summary_report.tsv` with
@@ -557,7 +557,7 @@ quality_filter:
 ```
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --config my-strict.yaml
+meta-pipeline-MAGDrep run -i mags/ -o results/ --config my-strict.yaml
 ```
 
 Dereplication now operates only on high-quality genomes.
@@ -615,7 +615,7 @@ rm -rf .snakemake/locks
 Memory per pplacer process exceeded available RAM. Reduce:
 
 ```bash
-meta-pipeline-MAGDrep qc ... --config gtdbtk.pplacer_cpus=1
+meta-pipeline-MAGDrep run ... --config gtdbtk.pplacer_cpus=1
 ```
 
 Or run GTDB-Tk on a memory partition (see SLURM deployment docs).

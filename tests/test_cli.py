@@ -11,35 +11,35 @@ def runner():
 def test_version_flag(runner):
     result = runner.invoke(main, ["--version"])
     assert result.exit_code == 0
-    assert "1.1.0" in result.output
+    assert "1.2.0" in result.output
 
 
 def test_help_flag(runner):
     result = runner.invoke(main, ["--help"])
     assert result.exit_code == 0
-    assert "qc" in result.output
+    assert "run" in result.output
     assert "db" in result.output
 
 
-def test_qc_requires_input(runner):
-    result = runner.invoke(main, ["qc"])
+def test_run_requires_input(runner):
+    result = runner.invoke(main, ["run"])
     assert result.exit_code != 0
     assert "input" in result.output.lower() or "Missing" in result.output
 
 
-def test_qc_requires_output(runner, tmp_path):
+def test_run_requires_output(runner, tmp_path):
     mag_dir = tmp_path / "mags"
     mag_dir.mkdir()
-    result = runner.invoke(main, ["qc", "-i", str(mag_dir)])
+    result = runner.invoke(main, ["run", "-i", str(mag_dir)])
     assert result.exit_code != 0
 
 
-def test_qc_invalid_step(runner, tmp_path):
+def test_run_invalid_step(runner, tmp_path):
     mag_dir = tmp_path / "mags"
     mag_dir.mkdir()
     out_dir = tmp_path / "out"
     result = runner.invoke(main, [
-        "qc", "-i", str(mag_dir), "-o", str(out_dir),
+        "run", "-i", str(mag_dir), "-o", str(out_dir),
         "--steps", "bogus_step", "--dry-run"
     ])
     assert result.exit_code != 0

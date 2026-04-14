@@ -1,3 +1,22 @@
+# Test data (downloaded on demand)
 tests/data/genomes/
+
+# Reference databases (keep only the download script)
 databases/*
 !databases/download.py
+
+# Pipeline run outputs
+results/
+
+# Snakemake working directory
+.snakemake/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Editor / OS cruft
+.DS_Store
+.vscode/
+.idea/

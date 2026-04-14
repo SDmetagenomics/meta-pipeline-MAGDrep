@@ -8,7 +8,7 @@
 [![Snakemake](https://img.shields.io/badge/snakemake-9.16-039475?logo=snakemake&logoColor=white)](https://snakemake.readthedocs.io/)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-58%2F58%20passing-brightgreen)]()
-[![Version](https://img.shields.io/badge/version-1.1.0-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-1.2.0-brightgreen)]()
 
 </div>
 
@@ -47,7 +47,7 @@ meta-pipeline-MAGDrep db update
 meta-pipeline-MAGDrep db status      # should read "All databases ready"
 
 # 3. Run the pipeline
-meta-pipeline-MAGDrep qc -i mags/ -o results/
+meta-pipeline-MAGDrep run -i mags/ -o results/
 ```
 
 Need more detail? See the [**Program Guide**](docs/program-guide.md) for rationale, installation, functionality, runtime, and use-case walkthroughs.
@@ -74,7 +74,7 @@ Two options for `-i / --input`:
 **1. A directory** of FASTAs (`.fna`, `.fa`, `.fasta`, optionally gzipped):
 
 ```bash
-meta-pipeline-MAGDrep qc -i /path/to/mags/ -o results/
+meta-pipeline-MAGDrep run -i /path/to/mags/ -o results/
 ```
 
 **2. A text file** with one FASTA path per line — useful when MAGs are scattered across multiple directories or you want to run a curated subset:
@@ -88,7 +88,7 @@ meta-pipeline-MAGDrep qc -i /path/to/mags/ -o results/
 ```
 
 ```bash
-meta-pipeline-MAGDrep qc -i mags.txt -o results/
+meta-pipeline-MAGDrep run -i mags.txt -o results/
 ```
 
 Relative paths resolve against the list file's directory. `~` expands to
@@ -132,7 +132,7 @@ export MAGDREP_DB_DIR=/shared/lab/meta-pipeline-MAGDrep-db
 # Now every command finds them automatically
 meta-pipeline-MAGDrep db update     # downloads to $MAGDREP_DB_DIR
 meta-pipeline-MAGDrep db status     # checks $MAGDREP_DB_DIR
-meta-pipeline-MAGDrep qc -i mags/ -o results/   # uses $MAGDREP_DB_DIR
+meta-pipeline-MAGDrep run -i mags/ -o results/   # uses $MAGDREP_DB_DIR
 ```
 
 Resolution order: `--db-dir` flag > `$MAGDREP_DB_DIR` > project `databases/`.
@@ -155,13 +155,13 @@ Options:
 Commands:
   benchmark  Summarize step timing from a completed pipeline run.
   db         Manage reference databases.
-  qc         Run quality assessment on a directory of MAG FASTA files.
+  run        Run the pipeline on a directory or path-list of MAGs.
 ```
 
-### `qc` — run the pipeline
+### `run` — run the pipeline
 
 ```
-Usage: meta-pipeline-MAGDrep qc [OPTIONS]
+Usage: meta-pipeline-MAGDrep run [OPTIONS]
 
 Options:
   -i, --input PATH                Directory of MAG FASTA files OR a text file
@@ -184,7 +184,7 @@ Options:
                                   Memory (GB) on memory-partition nodes.
                                   Defaults to --cluster-mem-gb.
   --slurm-standard-partition TEXT SLURM partition for CheckM2 and most rules.  [default: normal]
-  --slurm-memory-partition TEXT   SLURM partition for GTDB-Tk (high-memory).
+  --slurm-memory-partition TEXT   SLURM partition for GTDB-Tk (memory).
                                   Defaults to --slurm-standard-partition.
   --help                          Show this message and exit.
 ```
@@ -225,17 +225,17 @@ Usage: meta-pipeline-MAGDrep benchmark [OPTIONS] RESULTS_DIR
 
 ```bash
 # Run with a custom config
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --config my-config.yaml
+meta-pipeline-MAGDrep run -i mags/ -o results/ --config my-config.yaml
 
 # Skip the taxonomy step (fast dev iteration)
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --skip gtdbtk
+meta-pipeline-MAGDrep run -i mags/ -o results/ --skip gtdbtk
 
 # HPC with separate standard + memory partitions
-meta-pipeline-MAGDrep qc -i mags/ -o results/ --profile slurm \
+meta-pipeline-MAGDrep run -i mags/ -o results/ --profile slurm \
     --slurm-standard-partition standard --slurm-memory-partition memory
 
 # GCP (see docs/deployment/gcp.md for setup)
-meta-pipeline-MAGDrep qc -i gs://bucket/mags/ -o gs://bucket/results/ --profile gcp
+meta-pipeline-MAGDrep run -i gs://bucket/mags/ -o gs://bucket/results/ --profile gcp
 
 # Check how long each step took
 meta-pipeline-MAGDrep benchmark results/

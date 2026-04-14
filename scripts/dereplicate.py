@@ -33,51 +33,43 @@ def parse_edge_list(edge_path: Path) -> list[dict]:
     return edges
 
 
-def _min_max_normalize(values: list[float]) -> list[float]:
-    """Min-max normalize values to [0, 1]. Returns 1.0 for all if range is 0."""
-    if not values:
-        return []
-    vmin = min(values)
-    vmax = max(values)
-    if vmax == vmin:
-        return [1.0] * len(values)
-    return [(v - vmin) / (vmax - vmin) for v in values]
-
-
 def compute_composite_scores(genomes: dict[str, dict], weights: dict) -> dict[str, float]:
+    """Compute a composite quality score for representative selection.
+
+    Score = A * Completeness
+          - B * Contamination
+          + C * (Contamination * strain_heterogeneity / 100)
+          + D * log10(N50)
+          + E * log10(genome_size)
+
+    Default weights: A=1, B=5, C=1, D=0.5, E=0. All configurable via the
+    `score_weights` section of config.yaml.
+
+    Note: CheckM2 does not emit strain_heterogeneity (that was a CheckM1
+    metric); it is treated as 0 when absent, which zeroes the C term.
+    Higher score = better representative.
     """
-    Compute normalized composite quality scores for representative selection.
+    # Coerce weights to float (Snakemake config pipeline can stringify values)
+    A = float(weights.get("A", weights.get("A_completeness", 1.0)))
+    B = float(weights.get("B", weights.get("B_contamination", 5.0)))
+    C = float(weights.get("C", weights.get("C_strain_het", 1.0)))
+    D = float(weights.get("D", weights.get("D_log_n50", 0.5)))
+    E = float(weights.get("E", weights.get("E_log_size", 0.0)))
 
-    Each metric is min-max normalized to [0, 1] across the filtered genome set,
-    then weighted and summed. Higher score = better representative.
-    """
-    mag_ids = list(genomes.keys())
-    if not mag_ids:
-        return {}
+    scores: dict[str, float] = {}
+    for mid, row in genomes.items():
+        completeness = float(row.get("completeness", 0) or 0)
+        contamination = float(row.get("contamination", 0) or 0)
+        strain_het = float(row.get("strain_heterogeneity", 0) or 0)
+        n50 = max(float(row.get("n50_bp", 1) or 1), 1)
+        size = max(float(row.get("total_length_bp", 1) or 1), 1)
 
-    # Coerce weights to float (Snakemake's config pipeline can stringify values)
-    w_qscore = float(weights.get("w_qscore", 1.0))
-    w_completeness = float(weights.get("w_completeness", 1.0))
-    w_n50 = float(weights.get("w_n50", 0.5))
-    w_contam = float(weights.get("w_contam", 0.5))
-
-    raw_qscore = [float(genomes[m].get("quality_score", 0)) for m in mag_ids]
-    raw_comp = [float(genomes[m].get("completeness", 0)) for m in mag_ids]
-    raw_n50 = [math.log10(max(float(genomes[m].get("n50_bp", 1)), 1)) for m in mag_ids]
-    raw_contam = [100.0 - float(genomes[m].get("contamination", 0)) for m in mag_ids]
-
-    norm_qscore = _min_max_normalize(raw_qscore)
-    norm_comp = _min_max_normalize(raw_comp)
-    norm_n50 = _min_max_normalize(raw_n50)
-    norm_contam = _min_max_normalize(raw_contam)
-
-    scores = {}
-    for i, mid in enumerate(mag_ids):
         scores[mid] = (
-            w_qscore * norm_qscore[i]
-            + w_completeness * norm_comp[i]
-            + w_n50 * norm_n50[i]
-            + w_contam * norm_contam[i]
+            A * completeness
+            - B * contamination
+            + C * (contamination * strain_het / 100.0)
+            + D * math.log10(n50)
+            + E * math.log10(size)
         )
     return scores
 
@@ -309,16 +301,44 @@ def run_cluster(
     output_clusters: str, output_derep_report: str,
     ani_threshold: float, min_af: float,
     score_weights: dict,
+    min_completeness: float = 60.0,
 ) -> None:
-    """Cluster genomes and select representatives."""
-    genomes = {}
+    """Cluster genomes and select representatives.
+
+    Only genomes with completeness >= *min_completeness* are eligible for
+    dereplication. skani triangle still runs on the full filtered set,
+    but the clustering / representative selection happens on the
+    sufficiently-complete subset. Defaults to 60% — matches MIMAG's
+    medium-quality floor.
+    """
+    all_genomes: dict[str, dict] = {}
     with open(filtered_report) as f:
         header = f.readline().strip().split("\t")
         for line in f:
             values = line.strip().split("\t")
             row = dict(zip(header, values))
             mid = row["mag_id"]
-            genomes[mid] = row
+            all_genomes[mid] = row
+
+    # Apply the completeness gate for dereplication
+    def _completeness(r):
+        v = r.get("completeness", 0)
+        try:
+            return float(v or 0)
+        except (ValueError, TypeError):
+            return 0.0
+
+    genomes = {
+        mid: row for mid, row in all_genomes.items()
+        if _completeness(row) >= float(min_completeness)
+    }
+    dropped = len(all_genomes) - len(genomes)
+    if dropped:
+        print(
+            f"[dereplicate] {dropped} genome(s) below {min_completeness}% "
+            f"completeness excluded from clustering "
+            f"(remaining: {len(genomes)})"
+        )
 
     edges = parse_edge_list(Path(edge_list))
     scores = compute_composite_scores(genomes, score_weights)
@@ -379,9 +399,11 @@ if __name__ == "__main__":
         parser.add_argument("--output-derep-report", required=True)
         parser.add_argument("--ani-threshold", type=float, default=95.0)
         parser.add_argument("--min-af", type=float, default=10.0)
+        parser.add_argument("--min-completeness", type=float, default=60.0)
         parser.add_argument("--score-weights", default="{}")
         args = parser.parse_args(sys.argv[2:])
         weights = json.loads(args.score_weights) if args.score_weights else {}
         run_cluster(args.edge_list, args.filtered_report,
                     args.output_clusters, args.output_derep_report,
-                    args.ani_threshold, args.min_af, weights)
+                    args.ani_threshold, args.min_af, weights,
+                    min_completeness=args.min_completeness)

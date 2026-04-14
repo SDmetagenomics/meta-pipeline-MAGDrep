@@ -9,29 +9,46 @@ from scripts.dereplicate import (
 )
 
 
-def test_compute_composite_scores_basic():
+def test_compute_composite_scores_higher_completeness_wins():
+    """Completeness weighted +A, contamination weighted -B → A better than B."""
     genomes = {
-        "mag_A": {"quality_score": 90, "completeness": 95, "n50_bp": 100000,
-                   "contamination": 1.0, "css": 0.1},
-        "mag_B": {"quality_score": 50, "completeness": 65, "n50_bp": 10000,
-                   "contamination": 8.0, "css": 0.4},
+        "mag_A": {"completeness": 95, "contamination": 1.0, "n50_bp": 100000, "total_length_bp": 4e6},
+        "mag_B": {"completeness": 65, "contamination": 8.0, "n50_bp": 10000, "total_length_bp": 4e6},
     }
-    weights = {"w_qscore": 1.0, "w_completeness": 1.0, "w_n50": 0.5,
-               "w_contam": 0.5}
-    scores = compute_composite_scores(genomes, weights)
+    scores = compute_composite_scores(genomes, {})
     assert scores["mag_A"] > scores["mag_B"]
+
+
+def test_compute_composite_scores_formula_matches_spec():
+    """Sanity-check the exact formula with known numbers and defaults."""
+    genomes = {
+        "mag_X": {"completeness": 90, "contamination": 2.0, "n50_bp": 100000, "total_length_bp": 1e6},
+    }
+    # Defaults: A=1, B=5, C=1, D=0.5, E=0; strain_heterogeneity missing → 0
+    scores = compute_composite_scores(genomes, {})
+    expected = 1 * 90 - 5 * 2.0 + 1 * (2.0 * 0 / 100) + 0.5 * math.log10(100000) + 0 * math.log10(1e6)
+    assert scores["mag_X"] == pytest.approx(expected)
+
+
+def test_compute_composite_scores_strain_het_term_activates():
+    """When strain_heterogeneity is supplied, the C term adds a positive bonus."""
+    genomes = {
+        "with_het": {"completeness": 90, "contamination": 5.0, "n50_bp": 10000,
+                     "total_length_bp": 4e6, "strain_heterogeneity": 80.0},
+        "no_het":   {"completeness": 90, "contamination": 5.0, "n50_bp": 10000,
+                     "total_length_bp": 4e6},
+    }
+    scores = compute_composite_scores(genomes, {})
+    # with_het gets +C * 5.0 * 80.0/100 = +4 bonus (net worse contamination "forgiven")
+    assert scores["with_het"] > scores["no_het"]
 
 
 def test_compute_composite_scores_identical_values():
     genomes = {
-        "mag_A": {"quality_score": 90, "completeness": 95, "n50_bp": 50000,
-                   "contamination": 1.0, "css": 0.0},
-        "mag_B": {"quality_score": 90, "completeness": 95, "n50_bp": 50000,
-                   "contamination": 1.0, "css": 0.0},
+        "mag_A": {"completeness": 95, "contamination": 1.0, "n50_bp": 50000, "total_length_bp": 4e6},
+        "mag_B": {"completeness": 95, "contamination": 1.0, "n50_bp": 50000, "total_length_bp": 4e6},
     }
-    weights = {"w_qscore": 1.0, "w_completeness": 1.0, "w_n50": 0.5,
-               "w_contam": 0.5}
-    scores = compute_composite_scores(genomes, weights)
+    scores = compute_composite_scores(genomes, {})
     assert scores["mag_A"] == pytest.approx(scores["mag_B"])
 
 

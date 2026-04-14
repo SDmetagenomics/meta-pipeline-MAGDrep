@@ -20,7 +20,7 @@
 #   export GOOGLE_BATCH_PROJECT=my-project
 #   export GOOGLE_BATCH_REGION=us-central1
 #   export GOOGLE_BATCH_BUCKET=my-magdrep-bucket
-#   meta-pipeline-MAGDrep qc -i gs://bucket/mags -o gs://bucket/results --profile gcp
+#   meta-pipeline-MAGDrep run -i gs://bucket/mags -o gs://bucket/results --profile gcp
 #
 # See docs/deployment/gcp.md for full setup instructions.
 

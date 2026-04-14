@@ -113,7 +113,7 @@ export MAGDREP_CONTAINER=gcr.io/YOUR_PROJECT/magdrep:v0.1
 gsutil -m cp mags/*.fna gs://my-magdrep-bucket/mags/
 
 # Run pipeline — inputs and outputs on GCS
-meta-pipeline-MAGDrep qc \
+meta-pipeline-MAGDrep run \
     -i gs://my-magdrep-bucket/mags/ \
     -o gs://my-magdrep-bucket/runs/2026-04/ \
     --profile gcp \

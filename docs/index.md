@@ -22,7 +22,7 @@ git clone https://github.com/SDmetagenomics/meta-pipeline-MAGDrep.git
 cd meta-pipeline-MAGDrep
 pip install -e . --no-deps
 meta-pipeline-MAGDrep db update
-meta-pipeline-MAGDrep qc -i mags/ -o results/
+meta-pipeline-MAGDrep run -i mags/ -o results/
 ```
 
 See the [Quick Start](quickstart.md) guide for full details.
