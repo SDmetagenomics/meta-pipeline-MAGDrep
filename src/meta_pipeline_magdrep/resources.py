@@ -126,7 +126,7 @@ def detect_slurm_node_resources(
         if len(parts) < 2:
             continue
         try:
-            cpus = int(parts[0])
+            cpus = int(parts[0].rstrip("+"))
             mem_mb = int(parts[1].rstrip("+"))
         except ValueError:
             continue
