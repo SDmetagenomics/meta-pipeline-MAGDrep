@@ -17,7 +17,7 @@ import subprocess
 from pathlib import Path
 
 
-CHECKM1_ENV = "magdrep-checkm1"
+CHECKM1_ENV = os.environ.get("MAGDREP_CHECKM1_ENV", "magdrep-checkm1")
 
 
 def _resolve_checkm1_db(db_path: str) -> str:

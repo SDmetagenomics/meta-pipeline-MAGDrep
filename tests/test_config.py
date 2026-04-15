@@ -124,8 +124,12 @@ def test_resolve_db_dir_from_persistent_config(monkeypatch, tmp_path):
 
 def test_load_and_merge_config_honors_env_var(monkeypatch):
     """load_and_merge_config should pick up MAGDREP_DB_DIR when config
-    doesn't override db_dir explicitly."""
+    doesn't override db_dir explicitly. Tool-specific env vars are cleared
+    so the fallback to db_dir/<tool> is exercised."""
     monkeypatch.setenv(DB_DIR_ENV_VAR, "/tmp/lab-db")
+    monkeypatch.delenv("CHECKM2DB", raising=False)
+    monkeypatch.delenv("GTDBTK_DATA_PATH", raising=False)
+    monkeypatch.delenv("CHECKM_DATA_PATH", raising=False)
     cfg = load_and_merge_config()
     assert cfg["db_dir"] == "/tmp/lab-db"
     assert cfg["checkm2_db_path"] == "/tmp/lab-db/checkm2"

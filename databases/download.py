@@ -7,6 +7,7 @@ track completion with sentinel files so re-runs are fast.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -32,7 +33,7 @@ DATABASES = {
 
 
 CHECKM1_DB_URL = "https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz"
-CHECKM1_ENV = "magdrep-checkm1"
+CHECKM1_ENV = os.environ.get("MAGDREP_CHECKM1_ENV", "magdrep-checkm1")
 
 
 def download_checkm1(db_dir: Path, force: bool = False) -> Path:

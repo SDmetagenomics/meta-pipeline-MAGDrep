@@ -159,7 +159,13 @@ def load_and_merge_config(
     db_dir, _source = resolve_db_dir(explicit)
     cfg["db_dir"] = str(db_dir)
 
-    # Resolve per-tool database paths: if null, default to db_dir/<tool>
+    # Resolve per-tool database paths.
+    # Priority: explicit config > standard tool env var > db_dir/<tool>
+    _tool_env_vars = {
+        "checkm1": "CHECKM_DATA_PATH",
+        "checkm2": "CHECKM2DB",
+        "gtdbtk": "GTDBTK_DATA_PATH",
+    }
     for tool in ("checkm1", "checkm2", "gtdbtk"):
         key = f"{tool}_db_path"
         val = cfg.get(key)
@@ -168,6 +174,12 @@ def load_and_merge_config(
             if not p.is_absolute():
                 cfg[key] = str(_PROJECT_ROOT / p)
         else:
-            cfg[key] = str(db_dir / tool)
+            env_val = os.environ.get(_tool_env_vars[tool])
+            if env_val:
+                # CHECKM2DB points to the .dmnd file; use its parent directory
+                p = Path(env_val)
+                cfg[key] = str(p.parent if p.is_file() else p)
+            else:
+                cfg[key] = str(db_dir / tool)
 
     return cfg
